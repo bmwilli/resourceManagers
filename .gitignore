@@ -5,3 +5,7 @@
 
 #Bin
 target/
+
+#Files
+*.log
+*.swp
