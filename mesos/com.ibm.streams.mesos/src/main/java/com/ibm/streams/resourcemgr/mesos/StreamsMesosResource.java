@@ -6,11 +6,16 @@ package com.ibm.streams.resourcemgr.mesos;
 
 
 //import java.net.UnknownHostException;
+import java.util.List;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.Map;
 
 import java.util.List;
 import java.util.Set;
+
+import org.apache.mesos.Protos;
+import org.apache.mesos.Protos.CommandInfo;
 
 /*
 import org.apache.hadoop.yarn.api.ApplicationConstants;
@@ -45,16 +50,22 @@ class StreamsMesosResource {
 	private StreamsMesosResourceState state = StreamsMesosResourceState.NEW;
 	private Set<String> tags = new HashSet<String>();
 	private int memory = -1, cpu = -1, priority=-1;
+	private boolean deployStreams;
+	private Map<String,String> argsMap;
+	private List<Protos.CommandInfo.URI> uriList;
+
 	//private ContainerRequest request ;
 	//private ContainerWrapper allocatedContainer = null;
 	private boolean isMaster = false;
 	private boolean cancelled = false;
 
-	public StreamsMesosResource(String id, String domainId, String zk, int priority) {
+	public StreamsMesosResource(String id, String domainId, String zk, int priority, Map<String,String> argsMap, List<Protos.CommandInfo.URI> uriList) {
 		this.id = id;
 		this.domainId = domainId;
 		this.zkConnect = zk;
 		this.priority = priority;
+		this.argsMap = argsMap;
+		this.uriList = uriList;
 	}
 
 	public String getId() {
@@ -207,6 +218,47 @@ class StreamsMesosResource {
 		return true;
 	}
   */
+
+	/* Mesos Helper Methods */
+	/* Create the CommandInfo for initiating a Streams Resource
+	 * Question: May need a second version for differences between
+	 * master streams resource (when domain is started) and all others
+	 */
+	public CommandInfo getStreamsResourceCommand() {
+
+		CommandInfo.Builder cmdInfoBuilder = Protos.CommandInfo.newBuilder();
+
+		// Create command, depends on deployment mechanism
+		StringBuffer cmdBuffer = new StringBuffer();
+
+		cmdBuffer.append("echo 'Setting up Streams Environment'");
+		if (argsMap.containsKey(StreamsMesosConstants.DEPLOY_ARG)) {
+			// run the streams resource installer
+			// create softlink for StreamsLink
+		} else {
+			//if --deploy not set, we assume streams is installed on all machines
+			String streamsInstall = argsMap.get(StreamsMesosConstants.INSTALL_PATH_ARG);
+			cmdBuffer.append(";ln -s " + streamsInstall + " StreamsLink");
+		}
+		// Source streams install path
+		cmdBuffer.append(";source StreamsLink/bin/streamsprofile.sh");
+
+		// Verify Streamtool version
+		cmdBuffer.append(";echo 'Streamtool version:'");
+		cmdBuffer.append(";streamtool version");
+
+		// Set command string
+		cmdInfoBuilder.setValue(cmdBuffer.toString());
+
+
+		// Add URI's (if any)
+		cmdInfoBuilder.addAllUris(uriList);
+
+		return cmdInfoBuilder.build();
+	}
+
+
+
 
 	@Override
 	public String toString() {

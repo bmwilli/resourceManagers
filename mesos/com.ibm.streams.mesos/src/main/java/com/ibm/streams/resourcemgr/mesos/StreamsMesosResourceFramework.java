@@ -51,6 +51,7 @@ public class StreamsMesosResourceFramework extends ResourceManagerAdapter {
 	private Scheduler scheduler;
 	private MesosSchedulerDriver driver;
 	private List<Protos.CommandInfo.URI> uriList = new ArrayList<Protos.CommandInfo.URI>();
+	private boolean deployStreams = false;
 
 
 	/* StreamsMesosREsource containers */
@@ -76,6 +77,7 @@ public class StreamsMesosResourceFramework extends ResourceManagerAdapter {
 		for (int i=0; i < args.length; i++) {
 			switch (args[i]) {
 			case StreamsMesosConstants.DEPLOY_ARG:
+				deployStreams = true;
 				argsMap.put(args[i], "true");
 				break;
 			case StreamsMesosConstants.MESOS_MASTER_ARG:
@@ -92,6 +94,7 @@ public class StreamsMesosResourceFramework extends ResourceManagerAdapter {
 		}
 		LOG.debug("ArgsMap: " + argsMap);
 	}
+
 
 
 	/***** Streams Resource Manager API Methods *****/
@@ -358,7 +361,7 @@ public class StreamsMesosResourceFramework extends ResourceManagerAdapter {
 
 	// Create a new SMR and put it proper containers
 	synchronized private StreamsMesosResource createNewSMR(String id, String domainId, String zk, int priority) {
-		StreamsMesosResource smr = new StreamsMesosResource(id, domainId, zk, priority);
+		StreamsMesosResource smr = new StreamsMesosResource(id, domainId, zk, priority, argsMap, uriList);
 		newRequests.add(smr);
 
 		return smr;
