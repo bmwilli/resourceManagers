@@ -1,6 +1,19 @@
 # Readme file for setting up Apache Mesos support for IBM® InfoSphere Streams
 This Readme file describes how to install and configure Apache Mesos for InfoSphere® Streams.
 
+## To Do (Working notes to get version 1.0.0 ready)
+* Initial version of --deploy (done)
+  * Will come back to this after getting stuff to work
+* Command executor
+  * Run streamtool version - done
+  * Run the controller - working on it...
+
+## Development Questions:
+* What to do if more newRequests than offers can handle?
+
+## Future:
+* Resource packing when offers have more resources that needed (see Building applications on mesos book)
+
 ## Dependencies
 * Apache Maven
     * To check whether Maven is installed on your system, enter which mvn.
@@ -22,7 +35,7 @@ Use Maven to compile the source code for the application in the InfoSphere Strea
 1. Build and Install Mesos (I used 1.0.1)
 
 	See Mesos instructions
-	
+
 	export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/local/lib"
 
 2. Run standalone Mesos and Slave (no zookeeper)
@@ -38,14 +51,14 @@ Use Maven to compile the source code for the application in the InfoSphere Strea
 	-p 2888:2888 \
 	-p 3888:3888 \
 	jplock/zookeeper
-	
+
 	export STERAMS_ZKCONNECT=localhost:2181
-	
+
 4. Run streams-on-mesos using standalone master uri
 
 	cd scripts
 	./streams-on-mesos start --master localhost:5050 --deploy
-	
+
 
 ## Helpful Notes
 
@@ -67,13 +80,13 @@ If you ever need to stop an inactive framework in mesos:
 	> -p 2888:2888 \
 	> -p 3888:3888 \
 	> garland/zookeeper
-	
+
 	export STERAMS_ZKCONNECT=localhost:2181
-	
+
 2. Ensure Streams variables set
 
 	source <streams install location>/4.2.0.0/bin/streamsprofile.sh
-	
+
 3. Start Mesos Master
 
 	docker run --net="host" \
@@ -143,9 +156,8 @@ If you ever need to stop an inactive framework in mesos:
 8. Start the InfoSphere Streams domain by using the Domain Manager or the streamtool startdomain command.
 9. To stop the YARN application master, enter the following command:
 
-    `$STREAMS_INSTALL/bin/streams-on-yarn stop --zkconnect host:port -d domain-id ` 
+    `$STREAMS_INSTALL/bin/streams-on-yarn stop --zkconnect host:port -d domain-id `
 
     Notes:
     * The `--zkconnect` option specifies the name of one or more host and port pairs for the configured external ZooKeeper ensemble. This value is the external ZooKeeper connection string. If the STREAMS_ZKCONNECT environment variable is set to this value, you do not need to specify the --zkconnect option on the command. To obtain this value, enter the streamtool getzk -d domain-id command.
     * The `-d` option specifies the domain identifier. If the STREAMS_DOMAIN_ID environment variable is set to this value, you do not need to specify the -d option on the command.
-
