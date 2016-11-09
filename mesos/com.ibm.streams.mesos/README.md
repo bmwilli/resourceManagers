@@ -13,6 +13,7 @@ This Readme file describes how to install and configure Apache Mesos for InfoSph
 
 ## Future:
 * Resource packing when offers have more resources that needed (see Building applications on mesos book)
+* If cpu and mem set to -1, then use entire offer for a resource
 
 ## Dependencies
 * Apache Maven

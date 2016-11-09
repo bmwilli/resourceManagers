@@ -46,18 +46,29 @@ class StreamsMesosResource {
 		}
 	}
 
-	private String id, domainId = null, zkConnect = null;
+	// Unique Identier used for identification within Framework and for Mesos Task ID
+	private String id;
+	// Streams related members
+	private String domainId = null;
+	private String zkConnect = null;
 	private StreamsMesosResourceState state = StreamsMesosResourceState.NEW;
 	private Set<String> tags = new HashSet<String>();
-	private int memory = -1, cpu = -1, priority=-1;
+
 	private boolean deployStreams;
 	private Map<String,String> argsMap;
 	private List<Protos.CommandInfo.URI> uriList;
+
+	// Resource utilization related members
+	private int memory = -1;
+	private int cpu = -1
+	private int priority=-1;
 
 	//private ContainerRequest request ;
 	//private ContainerWrapper allocatedContainer = null;
 	private boolean isMaster = false;
 	private boolean cancelled = false;
+
+	// Mesos Task related members
 
 	public StreamsMesosResource(String id, String domainId, String zk, int priority, Map<String,String> argsMap, List<Protos.CommandInfo.URI> uriList) {
 		this.id = id;
@@ -255,6 +266,31 @@ class StreamsMesosResource {
 		cmdInfoBuilder.addAllUris(uriList);
 
 		return cmdInfoBuilder.build();
+	}
+
+  /**
+	 * Create Mesos Task Info for this Resource
+	 */
+	public Protos.TaskInfo buildStreamsMesosResourceTask(SlaveID targetSlave) {
+
+		// get new way to do this from yarn
+		Protos.TaskID taskId = buildNewTaskID();
+
+		// Get the commandInfo from the Streams Mesos Resource
+		Protos.CommandInfo commandInfo = smr.getStreamsResourceCommand();
+
+		// Work on getting this fillout out correctly
+		Protos.TaskInfo task = Protos.TaskInfo.newBuilder()
+				.setName(id)
+				.setTaskId(id)
+				.setSlaveId(targetSlave)
+				.addResources(buildResource("cpus",1))
+				.addResources(buildResource("mem",128))
+				.setData(ByteString.copyFromUtf8("" + taskIdCounter))
+				.setCommand(Protos.CommandInfo.newBuilder(commandInfo))
+				.build();
+
+		return task;
 	}
 
 

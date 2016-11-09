@@ -148,7 +148,7 @@ public class StreamsMesosResourceScheduler implements Scheduler {
 				if (taskIdCounter < 1) {
 					usedOffer = true;
 					LOG.debug("Launch 1 sample");
-					Protos.TaskInfo task = buildStreamsMesosResourceTask(offer,smr);
+					Protos.TaskInfo task = smr.buildStreamsMesosResourceTask(offer.getSlaveId());
 					LOG.debug("Launching task #" + String.valueOf(taskIdCounter) + "...");
 					launchTask(schedulerDriver, offer, task);
 					LOG.debug("...Launched task #" + String.valueOf(taskIdCounter));
@@ -194,27 +194,6 @@ public class StreamsMesosResourceScheduler implements Scheduler {
 	}
 
 
-	private Protos.TaskInfo buildStreamsMesosResourceTask(Protos.Offer offer, StreamsMesosResource smr) {
-
-		// get new way to do this from yarn
-		Protos.TaskID taskId = buildNewTaskID();
-
-		// Get the commandInfo from the Streams Mesos Resource
-		Protos.CommandInfo commandInfo = smr.getStreamsResourceCommand();
-
-		// Work on getting this fillout out correctly
-		Protos.TaskInfo task = Protos.TaskInfo.newBuilder()
-				.setName("task " + taskId)
-				.setTaskId(taskId)
-				.setSlaveId(offer.getSlaveId())
-				.addResources(buildResource("cpus",1))
-				.addResources(buildResource("mem",128))
-				.setData(ByteString.copyFromUtf8("" + taskIdCounter))
-				.setCommand(Protos.CommandInfo.newBuilder(commandInfo))
-				.build();
-
-		return task;
-	}
 
 
 	private Protos.TaskID buildNewTaskID() {

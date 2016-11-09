@@ -141,8 +141,7 @@ public class StreamsMesosResourceFramework extends ResourceManagerAdapter {
 		LOG.info("StreamsMesosResourceFramework.initialize() complete");
 
 		LOG.info("Creating a test...");
-		StreamsMesosResource smr = createNewSMR("Brian",
-			argsMap.get(StreamsMesosConstants.DOMAIN_ID_ARG),
+		StreamsMesosResource smr = createNewSMR(argsMap.get(StreamsMesosConstants.DOMAIN_ID_ARG),
 			argsMap.get(StreamsMesosConstants.ZK_ARG),
 			1);
 
@@ -361,7 +360,7 @@ public class StreamsMesosResourceFramework extends ResourceManagerAdapter {
 
 	// Create a new SMR and put it proper containers
 	synchronized private StreamsMesosResource createNewSMR(String id, String domainId, String zk, int priority) {
-		StreamsMesosResource smr = new StreamsMesosResource(id, domainId, zk, priority, argsMap, uriList);
+		StreamsMesosResource smr = new StreamsMesosResource(Utils.generateNextId("smr"), domainId, zk, priority, argsMap, uriList);
 		newRequests.add(smr);
 
 		return smr;
