@@ -3,7 +3,7 @@
 // * Copyright (C)2015, International Business Machines Corporation and *
 // * others. All Rights Reserved. *
 // *******************************************************************************
-// 
+//
 package com.ibm.streams.resourcemgr.mesos;
 
 import java.io.BufferedReader;
@@ -27,7 +27,7 @@ import java.util.concurrent.atomic.AtomicLong;
 public class Utils {
 
 	/** Returns the path on the FS for a class
-	 * @param _class Java class 
+	 * @param _class Java class
 	 * @return Path on the FS
 	 */
 	public static String getClassPath(Class<?> _class) {
@@ -82,9 +82,9 @@ public class Utils {
 	 * @return String form of input stream
 	 * @throws IOException
 	 */
-	public static String inputStreamToString(InputStream input) throws IOException {		 
+	public static String inputStreamToString(InputStream input) throws IOException {
 		if (input != null) {
-			StringWriter writer = new StringWriter();		 
+			StringWriter writer = new StringWriter();
 			char[] buffer = new char[1024];
 			try {
 				Reader reader = new BufferedReader(new InputStreamReader(input));
@@ -116,7 +116,7 @@ public class Utils {
 		int port = ss.getLocalPort();
 		ss.close();
 		return port;
-	} 
+	}
 
 	public static void sleepABit(long millis) {
 		try {
@@ -144,6 +144,9 @@ public class Utils {
 	public static int getIntProperty(Properties p, String name)  {
 		return Integer.parseInt(getProperty(p, name).trim());
 	}
+	public static double getDoubleProperty(Properties p, String name)  {
+		return Double.parseDouble(getProperty(p, name).trim());
+	}
 
 	static Map<String, AtomicLong> idMap = new HashMap<String, AtomicLong>();
 	public static String generateNextId (String name) {
@@ -162,7 +165,7 @@ public class Utils {
 		File folder = new File(name);
 		if(folder.exists()) {
 			File[] files = folder.listFiles();
-			if(files!=null) { 
+			if(files!=null) {
 				for(File f: files) {
 					if(f.isDirectory()) {
 						deleteDirectory(f.getAbsolutePath());

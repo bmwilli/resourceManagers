@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 #
-# 
+#
 from os.path import dirname, realpath, expanduser, sep
 from os import system, getenv
 import sys
@@ -21,13 +21,13 @@ class Command(object):
 		self._name = name
 		self._descr = descr
 		self._str = str
-		
+
 
 COMMANDS = {
-	"start": Command("start", "Starts the Streams Mesos Framework (Scheduler). If the --deploy option is specified,\n\tStreams will first be installed on the node before starting the services.", 
+	"start": Command("start", "Starts the Streams Mesos Framework (Scheduler). If the --deploy option is specified,\n\tStreams will first be installed on the node before starting the services.",
 			 "\t[--zkconnect {<host>:<port>},...]\n"
 			 + "\t[--master <Mesos Master URI>]\n"
-			 + "\t[-d,--domain-id <did>]\n" 
+			 + "\t[-d,--domain-id <did>]\n"
 			 + "\t[--deploy]\n"
 			 + "\t[--properties <optional: path to Streams Mesos Scheduler Properties>]"
 			 ),
@@ -46,7 +46,7 @@ def print_help(msg):
 		print COMMANDS[command]._str
 	print ""
 	sys.exit(msg)
-	
+
 def test_var(var, msg):
 	if(var == None):
 		print_help(msg)
@@ -70,11 +70,11 @@ am_prop_file = None
 
 if (is_prod_switch):
 	streams_mesos_jar=streams_install_dir+"/lib/"+streams_mesos_jar_basename
-	am_prop_file=streams_install_dir+"/etc/mesos/streams-am.properties"
+	am_prop_file=streams_install_dir+"/etc/mesos/streams-mesos.properties"
 else:
 	proj_path=(dirname(realpath(__file__))) + "/../"
 	streams_mesos_jar=proj_path + "target/" + streams_mesos_jar_basename
-	am_prop_file=proj_path+"/etc/streams-am.properties"
+	am_prop_file=proj_path+"/etc/streams-mesos.properties"
 
 
 if len(sys.argv) < 2:
@@ -114,17 +114,17 @@ for opt, arg in options:
 		wasPropSet=True
 	else:
 		sys.exit("Invalid option: " + opt)
-	
+
 
 java_command = "$JAVA_HOME/bin/java -cp"
 
 streams_product_cp = ":".join([
-					streams_install_dir + "/lib/com.ibm.streams.resourcemgr.jar", 
+					streams_install_dir + "/lib/com.ibm.streams.resourcemgr.jar",
 				  	streams_install_dir + "/lib/com.ibm.streams.resourcemgr.utils.jar",
 				  	streams_install_dir + "/system/impl/lib/com.ibm.streams.platform.jar"
 		       		])
 
-base_cp = (streams_mesos_jar + ":" 
+base_cp = (streams_mesos_jar + ":"
 	+ streams_install_dir + "/lib/" + streams_product_cp)
 
 hadoop_cp = getenv("HADOOP_CLASSPATH")
@@ -134,12 +134,12 @@ test_var(domain, "ERROR: Domain name not specified")
 
 if (hadoop_cp == None):
 	print "WARNING: HADOOP_CLASSPATH not set, will get errors if you configure hdfs provisioning directory"
-			
+
 if(sys.argv[1] == "start"):
 	streams_mesos_framework_class = "com.ibm.streams.resourcemgr.mesos.StreamsMesosResourceFramework"
 	print "streams_install_dir = ", streams_install_dir
-	
-	command=(java_command 
+
+	command=(java_command
 		 + " " + base_cp)
 	if (hadoop_cp != None):
 		 	command=(command + ":" + hadoop_cp)
@@ -152,29 +152,29 @@ if(sys.argv[1] == "start"):
 		 + " --install-path " + streams_install_dir
 		 )
 	if not wasDomainSet:
-		command = command+ " --domain-id " + domain 
+		command = command+ " --domain-id " + domain
 	if not wasZkSet:
 		command = command+ " --zkconnect " + zk
 	if not wasPropSet:
-		command = command+ " --properties " + am_prop_file 
+		command = command+ " --properties " + am_prop_file
 	if not wasMasterSet:
 		command = command+ " --master " + master
- 
+
 	rc = system(command)
 	if(rc != 0):
 		sys.exit("Failed")
-		
+
 elif(sys.argv[1] == "stop"):
-	command=( java_command 
-			+ " " + streams_product_cp 
+	command=( java_command
+			+ " " + streams_product_cp
 			+ " com.ibm.streams.resourcemgr.StopResourceServer "
 			+ " ".join(sys.argv[1:])
 			+ " --type mesos"
 		)
 	if not wasDomainSet:
-		command = command+ " -d " + domain 
+		command = command+ " -d " + domain
 	if not wasZkSet:
-		command = command+ " --zkconnect " + zk 
+		command = command+ " --zkconnect " + zk
 
 	rc = system(command)
 	if(rc != 0):
@@ -191,8 +191,8 @@ elif(sys.argv[1] == "stop"):
 	#cnt = commands.getoutput(cnt_cmd)
 	#while (cnt != "0"):
 		#command = (
-			#yarn_app_cmd + 
-			#+" |  head -n 1 | awk '{print $1}' | xargs " 
+			#yarn_app_cmd +
+			#+" |  head -n 1 | awk '{print $1}' | xargs "
 			#+ yarn_home + "/bin/yarn application -kill")
 		#rc = system(command)
 		#if(rc != 0):

@@ -7,13 +7,18 @@ This Readme file describes how to install and configure Apache Mesos for InfoSph
 * Command executor
   * Run streamtool version - done
   * Run the controller - working on it...
+* Config file processing
+  * cpu/memory for controllers
+
 
 ## Development Questions:
 * What to do if more newRequests than offers can handle?
 
 ## Future:
 * Resource packing when offers have more resources that needed (see Building applications on mesos book)
-* If cpu and mem set to -1, then use entire offer for a resource
+* If cpu and mem set to -1, then use entire offer for a resource...done
+* Marathon submission of framework
+  * run streams-on-mesos from marathon
 
 ## Dependencies
 * Apache Maven

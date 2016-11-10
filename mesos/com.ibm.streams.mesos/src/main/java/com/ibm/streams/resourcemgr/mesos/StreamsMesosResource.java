@@ -16,6 +16,7 @@ import java.util.Set;
 
 import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.CommandInfo;
+import org.apache.mesos.Protos.Resource;
 
 /*
 import org.apache.hadoop.yarn.api.ApplicationConstants;
@@ -28,9 +29,14 @@ import com.ibm.streams.resourcemgr.ResourceDescriptor;
 import com.ibm.streams.resourcemgr.ResourceDescriptorState;
 import com.ibm.streams.resourcemgr.ResourceManagerUtilities;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 //import com.ibm.streams.resourcemgr.yarn.ContainerWrapper.ContainerWrapperState;
 
 class StreamsMesosResource {
+	private static final Logger LOG = LoggerFactory.getLogger(StreamsMesosResource.class);
+
 	enum StreamsMesosResourceState {NEW, LAUNCHED, RUNNING, STOPPING, STOPPED, RELEASED;
 		@Override
 		public String toString() {
@@ -59,8 +65,8 @@ class StreamsMesosResource {
 	private List<Protos.CommandInfo.URI> uriList;
 
 	// Resource utilization related members
-	private int memory = -1;
-	private int cpu = -1
+	private double memory = -1;
+	private double cpu = -1;
 	private int priority=-1;
 
 	//private ContainerRequest request ;
@@ -95,16 +101,16 @@ class StreamsMesosResource {
 	public void setMaster(boolean isMaster) {
 		this.isMaster = isMaster;
 	}
-	public int getMemory() {
+	public double getMemory() {
 		return memory;
 	}
-	public void setMemory(int memory) {
+	public void setMemory(double memory) {
 		this.memory = memory;
 	}
-	public int getCpu() {
+	public double getCpu() {
 		return cpu;
 	}
-	public void setCpu(int cpu) {
+	public void setCpu(double cpu) {
 		this.cpu = cpu;
 	}
 	public Set<String> getTags() {
@@ -270,30 +276,59 @@ class StreamsMesosResource {
 
   /**
 	 * Create Mesos Task Info for this Resource
+	 * If cpus and/or memory are not specified, use all from offer
 	 */
-	public Protos.TaskInfo buildStreamsMesosResourceTask(SlaveID targetSlave) {
+	public Protos.TaskInfo buildStreamsMesosResourceTask(Protos.Offer offer) {
 
-		// get new way to do this from yarn
-		Protos.TaskID taskId = buildNewTaskID();
+		double task_cpus = getCpu();
+		double task_memory = getMemory();
+
+		// Create taskId
+		Protos.TaskID taskId = Protos.TaskID.newBuilder()
+			.setValue(getId())
+			.build();
+
+		// Calculate resources usage if configured to use it all
+		if ((task_cpus == StreamsMesosConstants.USE_ALL_CORES ) || (task_memory == StreamsMesosConstants.USE_ALL_MEMORY)) {
+			for (Resource r : offer.getResourcesList()) {
+				if ((r.getName().equals("cpus")) && (task_cpus == StreamsMesosConstants.USE_ALL_CORES)) {
+					task_cpus = r.getScalar().getValue();
+					LOG.debug("SMR Task (" + getId() + ") using all cpus in offer: " + String.valueOf(task_cpus));
+				}
+				if ((r.getName().equals("mem")) && (task_memory == StreamsMesosConstants.USE_ALL_MEMORY)) {
+					task_memory = r.getScalar().getValue();
+					LOG.debug("SMR Task (" + getId() + ") using all memory in offer: " + String.valueOf(task_memory));
+				}
+			}
+		}
 
 		// Get the commandInfo from the Streams Mesos Resource
-		Protos.CommandInfo commandInfo = smr.getStreamsResourceCommand();
+		Protos.CommandInfo commandInfo = getStreamsResourceCommand();
 
 		// Work on getting this fillout out correctly
 		Protos.TaskInfo task = Protos.TaskInfo.newBuilder()
-				.setName(id)
-				.setTaskId(id)
-				.setSlaveId(targetSlave)
-				.addResources(buildResource("cpus",1))
-				.addResources(buildResource("mem",128))
-				.setData(ByteString.copyFromUtf8("" + taskIdCounter))
+				.setName(getId())
+				.setTaskId(taskId)
+				.setSlaveId(offer.getSlaveId())
+				.addResources(buildResource("cpus",task_cpus))
+				.addResources(buildResource("mem",task_memory))
+				//.setData(ByteString.copyFromUtf8("" + taskIdCounter))
 				.setCommand(Protos.CommandInfo.newBuilder(commandInfo))
 				.build();
 
 		return task;
 	}
 
+	private Protos.Resource buildResource(String name, double value) {
+		return Protos.Resource.newBuilder()
+				.setName(name)
+				.setType(Protos.Value.Type.SCALAR)
+				.setScalar(buildScalar(value)).build();
+	}
 
+	private Protos.Value.Scalar.Builder buildScalar(double value) {
+		return Protos.Value.Scalar.newBuilder().setValue(value);
+	}
 
 
 	@Override

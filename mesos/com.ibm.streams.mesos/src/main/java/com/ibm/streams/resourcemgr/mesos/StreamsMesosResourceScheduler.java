@@ -148,7 +148,7 @@ public class StreamsMesosResourceScheduler implements Scheduler {
 				if (taskIdCounter < 1) {
 					usedOffer = true;
 					LOG.debug("Launch 1 sample");
-					Protos.TaskInfo task = smr.buildStreamsMesosResourceTask(offer.getSlaveId());
+					Protos.TaskInfo task = smr.buildStreamsMesosResourceTask(offer);
 					LOG.debug("Launching task #" + String.valueOf(taskIdCounter) + "...");
 					launchTask(schedulerDriver, offer, task);
 					LOG.debug("...Launched task #" + String.valueOf(taskIdCounter));
@@ -168,48 +168,6 @@ public class StreamsMesosResourceScheduler implements Scheduler {
 			}
 		} // for
 		LOG.info("Finished handilng offers");
-	}
-
-
-	// Sample build....DELETE ONCE WE CREATE OUR OWN
-	private Protos.TaskInfo buildNewTask(Protos.Offer offer) {
-
-		Protos.TaskID taskId = buildNewTaskID();
-
-		// Get the commandInfo from the Framework
-		Protos.CommandInfo commandInfo = streamsRM.getStreamsResourceCommand();
-
-
-		Protos.TaskInfo task = Protos.TaskInfo.newBuilder()
-				.setName("task " + taskId)
-				.setTaskId(taskId)
-				.setSlaveId(offer.getSlaveId())
-				.addResources(buildResource("cpus",1))
-				.addResources(buildResource("mem",128))
-				.setData(ByteString.copyFromUtf8("" + taskIdCounter))
-				.setCommand(Protos.CommandInfo.newBuilder(commandInfo))
-				.build();
-
-		return task;
-	}
-
-
-
-
-	private Protos.TaskID buildNewTaskID() {
-		return Protos.TaskID.newBuilder()
-				.setValue(Integer.toString(taskIdCounter++)).build();
-	}
-
-	private Protos.Resource buildResource(String name, double value) {
-		return Protos.Resource.newBuilder()
-				.setName(name)
-				.setType(Protos.Value.Type.SCALAR)
-				.setScalar(buildScalar(value)).build();
-	}
-
-	private Protos.Value.Scalar.Builder buildScalar(double value) {
-		return Protos.Value.Scalar.newBuilder().setValue(value);
 	}
 
 	private void launchTask(SchedulerDriver schedulerDriver, Protos.Offer offer, Protos.TaskInfo task) {

@@ -3,7 +3,9 @@
  */
 package com.ibm.streams.resourcemgr.mesos;
 
+import java.io.FileReader;
 import java.io.IOException;
+import java.io.FileNotFoundException;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -11,6 +13,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Iterator;
+import java.util.Properties;
 
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -48,6 +51,7 @@ public class StreamsMesosResourceFramework extends ResourceManagerAdapter {
 
 	private Map<String,String> envs = System.getenv();
 	private Map<String,String> argsMap = new HashMap<String, String>();
+	private Properties props = null;
 	private Scheduler scheduler;
 	private MesosSchedulerDriver driver;
 	private List<Protos.CommandInfo.URI> uriList = new ArrayList<Protos.CommandInfo.URI>();
@@ -93,6 +97,28 @@ public class StreamsMesosResourceFramework extends ResourceManagerAdapter {
 			}
 		}
 		LOG.debug("ArgsMap: " + argsMap);
+
+		String propsFile = null;
+		// Process Properties FileReader
+		if (argsMap.containsKey(StreamsMesosConstants.PROP_FILE_ARG))
+			propsFile = argsMap.get(StreamsMesosConstants.PROP_FILE_ARG);
+		else
+			propsFile = StreamsMesosConstants.RM_PROPERTIES_FILE;
+		LOG.debug("Reading Properties file from: " + propsFile);
+		props = new Properties();
+		try {
+			props.load(new FileReader(propsFile));
+		} catch (FileNotFoundException e) {
+			LOG.error("Could not find properties file: " + propsFile);
+			throw new StreamsMesosException("Could not find properties file: " + propsFile,e);
+		} catch (IOException e) {
+			LOG.error("IO Error reading the properties file: "  + propsFile);
+			throw new StreamsMesosException("IO Error reading the properties file: " + propsFile,e);
+		}
+
+		LOG.debug("Properties file properties: " + props.toString());
+
+
 	}
 
 
@@ -133,7 +159,8 @@ public class StreamsMesosResourceFramework extends ResourceManagerAdapter {
 
 		// Setup and register the Mesos Scheduler
 		LOG.info("About to call runMesosScheduler...");
-		runMesosScheduler(uriList,master);
+		//runMesosScheduler(uriList,master);
+		runMesosScheduler(master);
 
 		//LOG.info("*** calling waitForTestMessage()...");
 		//waitForTestMessage();
@@ -234,10 +261,11 @@ public class StreamsMesosResourceFramework extends ResourceManagerAdapter {
 		return cmdInfoBuilder.build();
 	}
 
-	private void runMesosScheduler(List<CommandInfo.URI>uriList, String mesosMaster) {
+	private void runMesosScheduler(String mesosMaster) {
+	//private void runMesosScheduler(List<CommandInfo.URI>uriList, String mesosMaster) {
 		LOG.info("Creating new Mesos Scheduler...");
-		LOG.info("URI List: " + uriList.toString());
-		LOG.info("commandInfo: " + getCommandInfo(uriList));;
+		//LOG.info("URI List: " + uriList.toString());
+		//LOG.info("commandInfo: " + getCommandInfo(uriList));;
 
 		scheduler = new StreamsMesosResourceScheduler(this);
 
@@ -359,8 +387,21 @@ public class StreamsMesosResourceFramework extends ResourceManagerAdapter {
 	/* StreamsMesosResource Container methods */
 
 	// Create a new SMR and put it proper containers
-	synchronized private StreamsMesosResource createNewSMR(String id, String domainId, String zk, int priority) {
+	synchronized private StreamsMesosResource createNewSMR(String domainId, String zk, int priority) {
 		StreamsMesosResource smr = new StreamsMesosResource(Utils.generateNextId("smr"), domainId, zk, priority, argsMap, uriList);
+
+		// Set resource needs  (Need to integrate with tags soon)
+		double memory = StreamsMesosConstants.RM_MEMORY_DEFAULT;
+		double cores = StreamsMesosConstants.RM_CORES_DEFAULT;
+
+		if (Utils.hasProperty(props, StreamsMesosConstants.PROPS_DC_MEMORY))
+				memory = Utils.getDoubleProperty(props, StreamsMesosConstants.PROPS_DC_MEMORY);
+
+		if (Utils.hasProperty(props, StreamsMesosConstants.PROPS_DC_CORES))
+				cores = Utils.getDoubleProperty(props, StreamsMesosConstants.PROPS_DC_CORES);
+		smr.setMemory(memory);
+		smr.setCpu(cores);
+
 		newRequests.add(smr);
 
 		return smr;
