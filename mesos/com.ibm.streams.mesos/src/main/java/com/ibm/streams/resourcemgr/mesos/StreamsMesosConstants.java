@@ -87,6 +87,10 @@ public class StreamsMesosConstants {
 		MEMORY_TAG = "memory",
 		CORES_TAG = "cores"
 	;
+	
+	/* Polling interval, how long to sleep between polling checks */
+	public static final long SLEEP_UNIT_MILLIS = 500;
+
 
 
 }

@@ -1,7 +1,14 @@
 # Readme file for setting up Apache Mesos support for IBM® InfoSphere Streams
 This Readme file describes how to install and configure Apache Mesos for InfoSphere® Streams.
 
+## mkdomain command
+streamtool mkdomain --property domain.externalResourceManager=mesos
+
 ## To Do (Working notes to get version 1.0.0 ready)
+* Double check synchronized blocks
+* Traverse ResourceDescriptor
+	* Map how fields are used and named
+	* Be able to get this from a StreamsMesosResource object
 * Initial version of --deploy (done)
   * Will come back to this after getting stuff to work
 * Command executor
@@ -19,6 +26,8 @@ This Readme file describes how to install and configure Apache Mesos for InfoSph
 * If cpu and mem set to -1, then use entire offer for a resource...done
 * Marathon submission of framework
   * run streams-on-mesos from marathon
+* Streams Resource Manager custom commands to get internal state of allResources list, etc.
+* Web interface to get internal state
 
 ## Dependencies
 * Apache Maven
