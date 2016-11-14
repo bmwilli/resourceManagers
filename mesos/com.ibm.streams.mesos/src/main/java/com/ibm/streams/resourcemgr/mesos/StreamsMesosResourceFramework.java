@@ -185,7 +185,7 @@ public class StreamsMesosResourceFramework extends ResourceManagerAdapter {
 	 */
 	@Override
 	public void close() {
-		LOG.debug("close()");
+		LOG.info("StreamsResourceServer called close()");
 		LOG.info("stopping the mesos driver...");
 		Protos.Status driverStatus = driver.stop();
 		LOG.info("...driver stopped, status: " + driverStatus.toString());
@@ -195,6 +195,7 @@ public class StreamsMesosResourceFramework extends ResourceManagerAdapter {
     @Override
     public void validateTags(ClientInfo client, ResourceTags tags, Locale locale) throws ResourceTagException,
             ResourceManagerException {
+		LOG.info("StreamsResourceServer called validateTags()");
         for (String tag : tags.getNames()) {
             TagDefinitionType definitionType = tags.getTagDefinitionType(tag);
             switch (definitionType) {
@@ -244,7 +245,9 @@ public class StreamsMesosResourceFramework extends ResourceManagerAdapter {
 	@Override
 	public ResourceDescriptor allocateMasterResource(ClientInfo clientInfo, AllocateMasterInfo request)
 			throws ResourceTagException, ResourceManagerException {
-		LOG.info("Allocate Master Resource Request: " + request);
+		LOG.info("StreamsResourceServer called allocateMasterResource()");
+		LOG.info("Request: " + request);
+		LOG.info("ClientInfo: " + clientInfo);
 		List<ResourceDescriptorState> lst = allocateResources(clientInfo, true, 1, request.getTags(),
 				AllocateType.SYNCHRONOUS);
 		if (lst.size() == 0)
@@ -264,8 +267,9 @@ public class StreamsMesosResourceFramework extends ResourceManagerAdapter {
 	@Override
 	public Collection<ResourceDescriptorState> allocateResources(ClientInfo clientInfo, AllocateInfo request)
 			throws ResourceTagException, ResourceManagerException {
-		LOG.info("Allocate Non-Master Resource Request: " + request);
-
+		LOG.info("StreamsResourceServer called allocateResources()");
+		LOG.info("Request: " + request);
+		LOG.info("ClientInfo: " + clientInfo);
 		return allocateResources(clientInfo, false, request.getCount(), request.getTags(), request.getType());
 
 	}
@@ -312,27 +316,31 @@ public class StreamsMesosResourceFramework extends ResourceManagerAdapter {
 		long endTime = System.currentTimeMillis() + (waitTimeSecs * 1000);
 
 		// Wait and poll to see if any are allocated in the given time
+		int allocCount = 0;
 		while (waitTimeSecs < 0 || System.currentTimeMillis() < endTime) {
-			int allocCount = 0;
 			synchronized (this) {
-				LOG.debug("Polling the new requests...");
+				LOG.trace("Polling the new requests...");
 				for (StreamsMesosResource smr : newAllocationRequests) {
-					LOG.debug("smr {id: " + smr.getId() + ", state: " + smr.getState().toString() + "}");
+					LOG.trace("smr {id: " + smr.getId() + ", state: " + smr.getState().toString() + "}");
 					if (smr.isRunning()) {
+						LOG.info("Resource is now running: " + smr);
 						allocCount++;
 					}
 				}
-				LOG.debug("Allocated Count: " + allocCount);
+				LOG.trace("Allocated Count: " + allocCount);
 				if (allocCount == newAllocationRequests.size()) {		
 					// We have them all, no need to continue to wait
-					LOG.debug("Allocated Count = # new allocation requests (" + newAllocationRequests.size() + "), stop waiting and polling");
+					LOG.info("Allocated Count = # new allocation requests (" + newAllocationRequests.size() + "), stop waiting and polling");
 					break;
 				}
 			}
-			LOG.debug("...waiting");
+			LOG.trace("...waiting");
 			Utils.sleepABit(StreamsMesosConstants.SLEEP_UNIT_MILLIS);
 		}
-		LOG.info("Finished waiting");
+		LOG.info("Finished waiting for new requests: allocated " + allocCount + " of " + newAllocationRequests.size() + " resources");
+		if (allocCount < newAllocationRequests.size()) {
+			LOG.info("Some did not get allocated, *** NEED TO IMPLEMENT PENDING ***");
+		}
 		// We have waited long enough
 		synchronized (this) {
 			List<ResourceDescriptorState> descriptorStates = new ArrayList<ResourceDescriptorState>();
@@ -399,14 +407,14 @@ public class StreamsMesosResourceFramework extends ResourceManagerAdapter {
 					break;
 				case PROPERTIES:
 					Properties propsDef = tags.getDefinitionAsProperties(tag);
-					LOG.info("Tag=" + tag + " props=" + propsDef.toString());
+					LOG.trace("Tag=" + tag + " props=" + propsDef.toString());
 					if (propsDef.containsKey(StreamsMesosConstants.MEMORY_TAG)) {
 						memory = Math.max(memory,  Utils.getIntProperty(propsDef, StreamsMesosConstants.MEMORY_TAG));
-						LOG.info("Tag=" + tag + " memory=" + memory);
+						LOG.trace("Tag=" + tag + " memory=" + memory);
 					}
 					if (propsDef.containsKey(StreamsMesosConstants.CORES_TAG)) {
 						cores = Math.max(cores,  Utils.getIntProperty(propsDef, StreamsMesosConstants.CORES_TAG));
-						LOG.info("Tag=" + tag + " cores=" + cores);
+						LOG.trace("Tag=" + tag + " cores=" + cores);
 					}
 					break;
 				default:
@@ -435,14 +443,14 @@ public class StreamsMesosResourceFramework extends ResourceManagerAdapter {
 		builder.setName(StreamsMesosConstants.FRAMEWORK_NAME);
 		return builder.build();
 	}
-
+/*
 	private static CommandInfo getCommandInfo(List<CommandInfo.URI> uriList) {
 		CommandInfo.Builder cmdInfoBuilder = Protos.CommandInfo.newBuilder();
 		cmdInfoBuilder.addAllUris(uriList);
 		cmdInfoBuilder.setValue(getStreamsShellCommand());
 		return cmdInfoBuilder.build();
 	}
-
+*/
 	private void runMesosScheduler(String mesosMaster) {
 		// private void runMesosScheduler(List<CommandInfo.URI>uriList, String
 		// mesosMaster) {
@@ -551,16 +559,6 @@ public class StreamsMesosResourceFramework extends ResourceManagerAdapter {
 	}
 
 	/*
-	 * Streams Command This may need to move into an executor if we have
-	 * different commands for master resource vs other resources or we have
-	 * trouble stopping the task
-	 */
-	private static String getStreamsShellCommand() {
-		String cmd = "echo '*** Brians Streams Command ***';" + "echo 'pwd; ' `pwd`;" + "ls -l";
-		return cmd;
-	}
-
-	/*
 	 * Framework public methods for collaboration with scheduler
 	 */
 
@@ -652,6 +650,7 @@ public class StreamsMesosResourceFramework extends ResourceManagerAdapter {
 	 * need a second version for differences between master streams resource
 	 * (when domain is started) and all others
 	 */
+	/*
 	public CommandInfo getStreamsResourceCommand() {
 
 		CommandInfo.Builder cmdInfoBuilder = Protos.CommandInfo.newBuilder();
@@ -684,29 +683,6 @@ public class StreamsMesosResourceFramework extends ResourceManagerAdapter {
 
 		return cmdInfoBuilder.build();
 	}
+	*/
 	
-	
-	
-	
-	
-
-	
-	// *** OLD TESTING - DELETE SOON
-	public synchronized void waitForTestMessage() {
-		LOG.info("*** About to wait() to see if schedulre can wake me up...");
-		try {
-			wait();
-		} catch (Exception e) {
-			LOG.error("*** wait exception: " + e.toString());
-		}
-		LOG.info("*** WAIT IS OVER!!!");
-	}
-
-	public synchronized String testMessage() {
-		LOG.info("*** testMessage(); called!!!...notify()...");
-		notify();
-		LOG.info("*** notify() returned");
-		return "You are talking to the Framework!!!";
-	}
-
 }

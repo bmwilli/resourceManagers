@@ -146,7 +146,7 @@ public class StreamsMesosResourceScheduler implements Scheduler {
 	 */
 	@Override
 	public void resourceOffers(SchedulerDriver schedulerDriver, List<Offer> offers) {
-		LOG.debug("Resource Offers Made...");
+		LOG.trace("Resource Offers Made...");
 
 		// Loop through offers, and exhaust the offer with resources we can
 		// satisfy
@@ -165,22 +165,23 @@ public class StreamsMesosResourceScheduler implements Scheduler {
 				}
 			}
 
-			LOG.debug("OFFER: {cpu: " + offerCpus + ", mem: " + offerMem + ", id:" + offer.getId() + "}");
+			LOG.trace("OFFER: {cpu: " + offerCpus + ", mem: " + offerMem + ", id:" + offer.getId() + "}");
 			// Eventually have a version of getNewSMR that allows cpu and memory
 			// to be sent in so we can find the one that matches what we want
 			StreamsMesosResource smr;
 			while ((smr = streamsRM.getNewSMR()) != null) {
 				boolean satisfiedRequest = false;
-				LOG.info("There is a resource request waiting; StreamsMesosResource:");
-				LOG.info(smr.toString());
+				LOG.info("Streams Mesos Scheduler: New Resource Request Found");
+				LOG.info("smr: " + smr.toString());
+				LOG.info("offer: {cpu: " + offerCpus + ", mem: " + offerMem + ", id:" + offer.getId() + "}");
 				LOG.info("Should check to see if we can satisfy with what is left in the offer");
 				
 				usedOffer = true;
 				
 				Protos.TaskInfo task = smr.buildStreamsMesosResourceTask(offer);
-				LOG.debug("Launching taskId: " + task.getTaskId() + "...");
+				LOG.info("Launching taskId: " + task.getTaskId() + "...");
 				launchTask(schedulerDriver, offer, task);
-				LOG.debug("...Launched taskId" + task.getTaskId());
+				LOG.info("...Launched taskId" + task.getTaskId());
 				satisfiedRequest = true;
 
 				if (satisfiedRequest) {
@@ -195,7 +196,7 @@ public class StreamsMesosResourceScheduler implements Scheduler {
 				schedulerDriver.declineOffer(offer.getId());
 			}
 		} // end for
-		LOG.debug("Finished handilng offers");
+		LOG.trace("Finished handilng offers");
 	}
 
 	private void launchTask(SchedulerDriver schedulerDriver, Protos.Offer offer, Protos.TaskInfo task) {

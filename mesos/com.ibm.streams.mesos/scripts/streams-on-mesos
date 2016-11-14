@@ -198,5 +198,20 @@ elif(sys.argv[1] == "stop"):
 		#if(rc != 0):
 			#sys.exit("Failed")
 		#cnt = commands.getoutput(cnt_cmd)
+# status
+elif(sys.argv[1] == "status"):
+	command = (java_command 
+		+ " " + base_cp 
+		+ " com.ibm.streams.resourcemgr.ResourceServer "
+		+ " ".join(sys.argv[1:])
+		+ " --status"
+		+ " --type mesos"
+		)
+	if not wasZkSet:
+		command = command + " --zkconnect " + zk 
+
+	rc = system(command)
+	if(rc != 0):
+		sys.exit(1)
 else:
 	print_help("Unknown command: " + sys.argv[1])

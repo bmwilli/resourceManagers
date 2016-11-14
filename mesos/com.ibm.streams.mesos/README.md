@@ -4,8 +4,16 @@ This Readme file describes how to install and configure Apache Mesos for InfoSph
 ## mkdomain command
 streamtool mkdomain --property domain.externalResourceManager=mesos
 
+## start mesos manager 
+./streams-on-mesos start --master zk://172.31.29.41:2181/mesos
+
+## Get status
+./streams-on-mesos status -d StreamsDomain
+
 ## To Do (Working notes to get version 1.0.0 ready)
 * Double check synchronized blocks
+* Track allocated and pending resources and messaging
+* Handle releaseResource() call for all and for specific descriptors
 * Traverse ResourceDescriptor
 	* Map how fields are used and named
 	* Be able to get this from a StreamsMesosResource object
@@ -16,11 +24,18 @@ streamtool mkdomain --property domain.externalResourceManager=mesos
   * Run the controller - working on it...
 * Config file processing
   * cpu/memory for controllers
+  * test
+* Create command line status
+  * streams-on-mesos status --zkconnect <zookeeper> -d <domain>
+    * Check how symphony passes --status to the ResourceManagerServer (not documented)
+* Validate Stop
+  * Prevent shutdown (unless --force) if we have resources being used
 
 
 ## Development Questions:
 * What to do if more newRequests than offers can handle?
 * sampleRM had a lot of logic about re-using resources that are already beeing used but were not excluded by the new allocateResources request.  Should we implement that?  When would you do that?  Would we do that in the case that we configured the resource manager to take entire offers?
+* How does Descriptor ResourceKind {CONTAINER, UNKNOWN, PHYSICAL_HOST,...} field impact how it is used?
 
 ## Future:
 * Resource packing when offers have more resources that needed (see Building applications on mesos book)
@@ -29,6 +44,12 @@ streamtool mkdomain --property domain.externalResourceManager=mesos
   * run streams-on-mesos from marathon
 * Streams Resource Manager custom commands to get internal state of allResources list, etc.
 * Web interface to get internal state
+* Persistent State manager - see Symphony Resource Manager
+* High Availability
+* Convert exceptions to ResourceManagerMessageException, did not see the API for that
+* Enhance logging (see Symphony resource manager)
+
+
 
 ## Dependencies
 * Apache Maven

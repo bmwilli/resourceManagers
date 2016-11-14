@@ -89,6 +89,7 @@ class StreamsMesosResource {
 
 	// Mesos Task related members
 	private String taskId = null;
+	private String hostName = null;
 	
 	
 	
@@ -191,6 +192,14 @@ class StreamsMesosResource {
 		this.taskId = taskId;
 	}
 	
+	public String getHostName() {
+		return hostName;
+	}
+
+	public void setHostName(String hostName) {
+		this.hostName = hostName;
+	}
+
 	public boolean isRunning() {
 		// Fix for mesos
 		return state == StreamsMesosResourceState.RUNNING;
@@ -223,7 +232,7 @@ class StreamsMesosResource {
 	public ResourceDescriptor getDescriptor() {
 		// if(allocatedContainer != null)
 		// return allocatedContainer.getDescriptor();
-		return StreamsMesosResourceFramework.getDescriptor(id, null);
+		return StreamsMesosResourceFramework.getDescriptor(id, getHostName());
 	}
 
 	public ResourceDescriptorState getDescriptorState() {
@@ -347,6 +356,9 @@ class StreamsMesosResource {
 		// Create taskId
 		Protos.TaskID taskIdProto = Protos.TaskID.newBuilder().setValue(getId()).build();
 		setTaskId(taskIdProto.getValue());
+		
+		// Set Host it will be run on
+		setHostName(offer.getHostname());
 
 		// Calculate resources usage if configured to use it all
 		if ((task_cpus == StreamsMesosConstants.USE_ALL_CORES)
@@ -390,7 +402,7 @@ class StreamsMesosResource {
 		return "StreamsMesosResource [id=" + id + ", state=" + state + ", domainId=" + domainId + ", zkConnect="
 				+ zkConnect + ", memory=" + memory + ", cpu=" + cpu + ", isMaster="
 				+ isMaster + ", cancelled=" + cancelled + ", tags=" + tags
-				+ ", taskId=" + taskId
+				+ ", taskId=" + taskId + ", hostName=" + hostName
 				// + ", allocatedContainer=" + allocatedContainer
 				+ "]";
 	}
