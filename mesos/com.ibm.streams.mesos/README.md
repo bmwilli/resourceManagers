@@ -20,6 +20,7 @@ streamtool mkdomain --property domain.externalResourceManager=mesos
 
 ## Development Questions:
 * What to do if more newRequests than offers can handle?
+* sampleRM had a lot of logic about re-using resources that are already beeing used but were not excluded by the new allocateResources request.  Should we implement that?  When would you do that?  Would we do that in the case that we configured the resource manager to take entire offers?
 
 ## Future:
 * Resource packing when offers have more resources that needed (see Building applications on mesos book)

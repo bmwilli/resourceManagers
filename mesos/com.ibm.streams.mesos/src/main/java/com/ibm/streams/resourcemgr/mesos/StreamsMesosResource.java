@@ -37,7 +37,7 @@ class StreamsMesosResource {
 	private static final Logger LOG = LoggerFactory.getLogger(StreamsMesosResource.class);
 
 	public static enum StreamsMesosResourceState {
-		NEW, LAUNCHED, RUNNING, STOPPING, STOPPED, RELEASED;
+		NEW, LAUNCHED, RUNNING, STOPPING, STOPPED, RELEASED, FAILED;
 		@Override
 		public String toString() {
 			switch (this) {
@@ -53,6 +53,8 @@ class StreamsMesosResource {
 				return "STOPPED";
 			case RELEASED:
 				return "RELEASED";
+			case FAILED:
+				return "FAILED";
 			default:
 				throw new IllegalArgumentException();
 			}
@@ -65,6 +67,9 @@ class StreamsMesosResource {
 	// Streams related members
 	private String domainId = null;
 	private String zkConnect = null;
+	// Need to understand more about how this is used within containers
+	// Was getting error about key not found, os went with Yarn RM approach to test
+	private String homeDir = null;
 	private StreamsMesosResourceState state = StreamsMesosResourceState.NEW;
 	private Set<String> tags = new HashSet<String>();
 
@@ -96,6 +101,8 @@ class StreamsMesosResource {
 		//this.priority = priority;
 		this.argsMap = argsMap;
 		this.uriList = uriList;
+		if (argsMap.containsKey(StreamsMesosConstants.HOME_DIR_ARG))
+			homeDir = argsMap.get(StreamsMesosConstants.HOME_DIR_ARG);
 	}
 
 	public String getId() {
@@ -138,6 +145,22 @@ class StreamsMesosResource {
 		return tags;
 	}
 	
+	
+	
+	/**
+	 * @return the homeDir
+	 */
+	public String getHomeDir() {
+		return homeDir;
+	}
+
+	/**
+	 * @param homeDir the homeDir to set
+	 */
+	public void setHomeDir(String homeDir) {
+		this.homeDir = homeDir;
+	}
+
 	/**
 	 * @return the state
 	 */
@@ -204,9 +227,7 @@ class StreamsMesosResource {
 	}
 
 	public ResourceDescriptorState getDescriptorState() {
-		// if(allocatedContainer != null)
-		// return allocatedContainer.getDescriptorState();
-		return StreamsMesosResourceFramework.getDescriptorState(false, getDescriptor());
+		return StreamsMesosResourceFramework.getDescriptorState(isRunning(), getDescriptor());
 	}
 
 	// OLD UNUSED FROM YARN
@@ -282,7 +303,9 @@ class StreamsMesosResource {
 		StringBuffer cmdBuffer = new StringBuffer();
 
 		cmdBuffer.append("echo 'Setting up Streams Environment'");
-		cmdBuffer.append(";export HOME=${MESOS_SANDBOX}");
+		if (getHomeDir() != null)
+			//cmdBuffer.append(";export HOME=${MESOS_SANDBOX}");
+			cmdBuffer.append("; export HOME=" + getHomeDir());
 
 		if (argsMap.containsKey(StreamsMesosConstants.DEPLOY_ARG)) {
 			// run the streams resource installer

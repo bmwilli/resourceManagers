@@ -244,6 +244,10 @@ public class StreamsMesosResourceScheduler implements Scheduler {
 		case TASK_FINISHED:
 		case TASK_KILLED:
 			newState = StreamsMesosResource.StreamsMesosResourceState.STOPPED;
+			break;
+		case TASK_ERROR:
+			newState = StreamsMesosResource.StreamsMesosResourceState.FAILED;
+			break;
 		default:
 			newState = null;
 			break;

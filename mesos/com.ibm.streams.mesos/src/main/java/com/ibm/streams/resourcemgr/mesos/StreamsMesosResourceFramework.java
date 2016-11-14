@@ -7,6 +7,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.FileNotFoundException;
 import java.util.List;
+import java.util.Locale;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -34,12 +35,15 @@ import com.ibm.streams.resourcemgr.ResourceDescriptor;
 import com.ibm.streams.resourcemgr.ResourceDescriptor.ResourceKind;
 import com.ibm.streams.resourcemgr.ResourceDescriptorState;
 import com.ibm.streams.resourcemgr.ResourceDescriptorState.AllocateState;
+import com.ibm.streams.resourcemgr.ResourceException;
 import com.ibm.streams.resourcemgr.ResourceManagerAdapter;
 import com.ibm.streams.resourcemgr.ResourceManagerException;
 import com.ibm.streams.resourcemgr.ResourceManagerUtilities;
 import com.ibm.streams.resourcemgr.ResourceManagerUtilities.ResourceManagerPackageType;
 import com.ibm.streams.resourcemgr.ResourceTagException;
 import com.ibm.streams.resourcemgr.ResourceTags;
+import com.ibm.streams.resourcemgr.ResourceTags.TagDefinitionType;
+import com.ibm.streams.resourcemgr.exception.ResourceTagMessageException;
 
 /**
  * @author bmwilli
@@ -187,6 +191,46 @@ public class StreamsMesosResourceFramework extends ResourceManagerAdapter {
 		LOG.info("...driver stopped, status: " + driverStatus.toString());
 		super.close();
 	}
+	
+    @Override
+    public void validateTags(ClientInfo client, ResourceTags tags, Locale locale) throws ResourceTagException,
+            ResourceManagerException {
+        for (String tag : tags.getNames()) {
+            TagDefinitionType definitionType = tags.getTagDefinitionType(tag);
+            switch (definitionType) {
+                case NONE:
+                    //no definition means use defaults
+                    break;
+                case PROPERTIES:
+                    Properties propsDef = tags.getDefinitionAsProperties(tag);
+                    for (Object key : propsDef.keySet()) {
+                        validateTagAttribute(tag, (String)key, propsDef.get(key));
+                    }
+                    break;
+                default:
+                    throw new ResourceTagException("Unexpected properties in definition for tag: " + tag);
+            }
+        }
+    }
+
+    private void validateTagAttribute(String tag, String key, Object valueObj) throws ResourceTagException {
+        //memory, cores
+        if (key.equals(StreamsMesosConstants.MEMORY_TAG) || key.equals(StreamsMesosConstants.CORES_TAG)) {
+            if (valueObj == null) {
+                 throw new ResourceTagException("Tag: " + tag + " memory property must not be empty if it is present.");
+            } else if (valueObj instanceof String) {
+                try {
+                    Integer.parseInt(valueObj.toString().trim());
+                } catch (NumberFormatException nfe) {
+                    throw new ResourceTagException("Tag: " + tag + " memory property must contain a numeric value.");
+                }
+            } else if (!(valueObj instanceof Long) && !(valueObj instanceof Integer)) {
+                throw new ResourceTagException("Tag: " + tag + " memory property must contain a numeric value.");
+            }
+        } else {
+            throw new ResourceTagException("Tag: " + tag + " contains an unsupported attribute");
+        }
+    }
 
 	/*
 	 * Create master resource. This resource is the first resource requested by
@@ -240,7 +284,7 @@ public class StreamsMesosResourceFramework extends ResourceManagerAdapter {
 		for (int i = 0; i < count; i++) {
 			// Creates new Resource, queues, and adds to map of all resources
 			StreamsMesosResource smr = createNewSMR(argsMap.get(StreamsMesosConstants.DOMAIN_ID_ARG),
-					argsMap.get(StreamsMesosConstants.ZK_ARG), isMaster);
+					argsMap.get(StreamsMesosConstants.ZK_ARG), tags, isMaster);
 			// Put it in our local list to wait a little bit of time to see if it gets started
 			newRequestsFromStreams.add(smr);
 		}
@@ -333,6 +377,53 @@ public class StreamsMesosResourceFramework extends ResourceManagerAdapter {
 	static ResourceDescriptorState getDescriptorState(boolean isRunning, ResourceDescriptor rd) {
 		AllocateState s = isRunning ? AllocateState.ALLOCATED : AllocateState.PENDING;
 		return new ResourceDescriptorState(s, rd);
+	}
+	
+	/** 
+	 * @param tags
+	 * @param smr
+	 * @throws ResourceTagException
+	 * @throws ResourceManagerException
+	 */
+	private void convertTags(ResourceTags tags, StreamsMesosResource smr) throws ResourceTagException, ResourceManagerException {
+		int cores = -1;
+		int memory = -1;
+		
+		for (String tag : tags.getNames()) {
+			try {
+				TagDefinitionType definitionType = tags.getTagDefinitionType(tag);
+				
+				switch (definitionType) {
+				case NONE:
+					// use default definition (probably just a name tag (e.g. AUDIT)
+					break;
+				case PROPERTIES:
+					Properties propsDef = tags.getDefinitionAsProperties(tag);
+					LOG.info("Tag=" + tag + " props=" + propsDef.toString());
+					if (propsDef.containsKey(StreamsMesosConstants.MEMORY_TAG)) {
+						memory = Math.max(memory,  Utils.getIntProperty(propsDef, StreamsMesosConstants.MEMORY_TAG));
+						LOG.info("Tag=" + tag + " memory=" + memory);
+					}
+					if (propsDef.containsKey(StreamsMesosConstants.CORES_TAG)) {
+						cores = Math.max(cores,  Utils.getIntProperty(propsDef, StreamsMesosConstants.CORES_TAG));
+						LOG.info("Tag=" + tag + " cores=" + cores);
+					}
+					break;
+				default:
+					throw new ResourceTagException("Tag=" + tag + " has unsupported tag definition type=" + definitionType);
+				}
+			} catch (ResourceException rs) {
+				throw new ResourceManagerException(rs);
+			}
+		}
+		
+		// Override memory and cores if they were set by the tags
+		if (memory != -1){
+			smr.setMemory(memory);
+		}
+		if (cores != -1) {
+			smr.setCpu(cores);
+		}
 	}
 
 	/***** MESOS PRIVATE SUPPORT METHODS *****/
@@ -476,11 +567,13 @@ public class StreamsMesosResourceFramework extends ResourceManagerAdapter {
 	/* StreamsMesosResource Container methods */
 
 	// Create a new SMR and put it proper containers
-	synchronized private StreamsMesosResource createNewSMR(String domainId, String zk, boolean isMaster) {
+	synchronized private StreamsMesosResource createNewSMR(String domainId, String zk, ResourceTags tags, boolean isMaster) throws ResourceManagerException {
+		// Create the Resource object (default state is NEW)
 		StreamsMesosResource smr = new StreamsMesosResource(Utils.generateNextId("smr"), domainId, zk, argsMap,
 				uriList);
 
 		smr.setMaster(isMaster);
+		
 		// Set resource needs (Need to integrate with tags soon)
 		double memory = StreamsMesosConstants.RM_MEMORY_DEFAULT;
 		double cores = StreamsMesosConstants.RM_CORES_DEFAULT;
@@ -493,6 +586,14 @@ public class StreamsMesosResourceFramework extends ResourceManagerAdapter {
 		smr.setMemory(memory);
 		smr.setCpu(cores);
 
+		// Set the resource tags
+		if (tags != null) {
+			convertTags(tags, smr); // may set mem/cpu from the tags if they are specified
+			smr.getTags().addAll(tags.getNames());
+		}
+		
+		
+		// Add to collections to track
 		LOG.info("Queuing new Resource Request: " + smr.toString());
 		newRequests.add(smr);
 		allResources.put(smr.getId(), smr);
@@ -583,7 +684,14 @@ public class StreamsMesosResourceFramework extends ResourceManagerAdapter {
 
 		return cmdInfoBuilder.build();
 	}
+	
+	
+	
+	
+	
 
+	
+	// *** OLD TESTING - DELETE SOON
 	public synchronized void waitForTestMessage() {
 		LOG.info("*** About to wait() to see if schedulre can wake me up...");
 		try {
