@@ -136,7 +136,7 @@ if (hadoop_cp == None):
 	print "WARNING: HADOOP_CLASSPATH not set, will get errors if you configure hdfs provisioning directory"
 
 if(sys.argv[1] == "start"):
-	streams_mesos_framework_class = "com.ibm.streams.resourcemgr.mesos.StreamsMesosResourceFramework"
+	streams_mesos_framework_class = "com.ibm.streams.resourcemgr.mesos.StreamsMesosResourceManager"
 	print "streams_install_dir = ", streams_install_dir
 
 	command=(java_command

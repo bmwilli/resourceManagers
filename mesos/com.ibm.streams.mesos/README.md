@@ -14,8 +14,8 @@ streamtool mkdomain --property domain.externalResourceManager=mesos
 * Refactor to pull containers of SMR's into a StreamsMesosState class
 	* StreamsMesosResourceManager
 	* StreamsMesosResource
-	* StreamsMesosResourceScheduler
-	* StreamsMesosResourceState
+	* StreamsMesosScheduler
+	* StreamsMesosState
 * Double check synchronized blocks
 * Track allocated and pending resources and messaging
 * Handle releaseResource() call for all and for specific descriptors

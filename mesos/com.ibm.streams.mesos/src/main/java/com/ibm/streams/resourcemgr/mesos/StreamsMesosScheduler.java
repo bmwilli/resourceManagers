@@ -26,23 +26,25 @@ import org.apache.mesos.SchedulerDriver;
  * @author bmwilli
  *
  */
-public class StreamsMesosResourceScheduler implements Scheduler {
+public class StreamsMesosScheduler implements Scheduler {
 
-	private static final Logger LOG = LoggerFactory.getLogger(StreamsMesosResourceScheduler.class);
+	private static final Logger LOG = LoggerFactory.getLogger(StreamsMesosScheduler.class);
 
 	/**
 	 * Framework that this scheduler communicates with The Framework is the
 	 * bridge to the Streams Resource Server which receives the requests for
 	 * resources
 	 */
-	StreamsMesosResourceFramework streamsRM;
+	StreamsMesosResourceManager _manager;
+	StreamsMesosState _state;
 
 	/**
 	 * @param streamsRM
 	 */
-	public StreamsMesosResourceScheduler(StreamsMesosResourceFramework streamsRM) {
+	public StreamsMesosScheduler(StreamsMesosResourceManager manager) {
 		super();
-		this.streamsRM = streamsRM;
+		_manager = manager;
+		_state = _manager.getState();
 	}
 
 	/*
@@ -162,7 +164,7 @@ public class StreamsMesosResourceScheduler implements Scheduler {
 			LOG.trace("OFFER: {cpu: " + offerCpus + ", mem: " + offerMem + ", id:" + offer.getId() + "}");
 
 			// Get the list of new requests from the Framework
-			List<StreamsMesosResource> newRequestList = streamsRM.getNewRequestList();
+			List<StreamsMesosResource> newRequestList = _state.getNewRequestList();
 			// Create List of Requests that we satisfied
 			List<StreamsMesosResource> satisfiedRequests = new ArrayList<StreamsMesosResource>();
 			
@@ -191,7 +193,7 @@ public class StreamsMesosResourceScheduler implements Scheduler {
 					satisfiedRequests.add(smr);
 					// Tell resource manager we have satisfied the request and
 					// status
-					streamsRM.updateSMR(smr.getId(), StreamsMesosResource.StreamsMesosResourceState.LAUNCHED);	
+					_state.updateSMR(smr.getId(), StreamsMesosResource.StreamsMesosResourceState.LAUNCHED);	
 
 				} else {
 					LOG.info("Offer did not meet requirements, maybe the next offer will.");
@@ -270,7 +272,7 @@ public class StreamsMesosResourceScheduler implements Scheduler {
 		// changed
 		if (newState != null) {
 			LOG.info("Mesos Task Status Update mapped to Resource State: " + newState.toString() );
-			streamsRM.updateSMRbyTaskId(taskStatus.getTaskId().getValue(), newState);
+			_state.updateSMRbyTaskId(taskStatus.getTaskId().getValue(), newState);
 		} else
 			LOG.info("Mesos Task Status Update was not mapped to a Resource State, no action");
 	}

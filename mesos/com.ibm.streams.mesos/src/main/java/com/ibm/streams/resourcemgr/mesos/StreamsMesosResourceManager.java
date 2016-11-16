@@ -14,8 +14,6 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -49,30 +47,20 @@ import com.ibm.streams.resourcemgr.ResourceTags.TagDefinitionType;
  * @author bmwilli
  *
  */
-public class StreamsMesosResourceFramework extends ResourceManagerAdapter {
+public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 
-	private static final Logger LOG = LoggerFactory.getLogger(StreamsMesosResourceFramework.class);
+	private static final Logger LOG = LoggerFactory.getLogger(StreamsMesosResourceManager.class);
 
-	private Map<String, String> envs = System.getenv();
-	private Map<String, String> argsMap = new HashMap<String, String>();
-	private Properties props = null;
-	private Scheduler scheduler;
-	private MesosSchedulerDriver driver;
-	private List<Protos.CommandInfo.URI> uriList = new ArrayList<Protos.CommandInfo.URI>();
-	private boolean deployStreams = false;
+	private StreamsMesosState _state;
+	private Map<String, String> _envs = System.getenv();
+	private Map<String, String> _argsMap = new HashMap<String, String>();
+	private Properties _props = null;
+	private Scheduler _scheduler;
+	private MesosSchedulerDriver _driver;
+	private List<Protos.CommandInfo.URI> _uriList = new ArrayList<Protos.CommandInfo.URI>();
+	private boolean _deployStreams = false;
 
-	/* StreamsMesosResource containers */
-	// newRequests: Tracks new requests from Streams and checked by scheduler
-	// when new offers arrive
-	// Using concurrent CopyOnWriteArrayList.  It is slower than ArrayList but at the rate that 
-	// we add/remove resources and requests it is more than fast enough and simplifies concurrency
-	private List<StreamsMesosResource> newRequests = new CopyOnWriteArrayList<StreamsMesosResource>();
 
-	// allResources: Tracks all resources no matter what state (e.g. requested,
-	// running, etc.)
-	// indexed by id that we generate
-	// Using concurrentHashMap.  simplifies concurrency between the threads of the this class and the mesos scheduler
-	private Map<String, StreamsMesosResource> allResources = new ConcurrentHashMap<String, StreamsMesosResource>();
 
 	/*
 	 * Constructor NOTE: Arguments passed are not in a reliable order need to
@@ -81,17 +69,17 @@ public class StreamsMesosResourceFramework extends ResourceManagerAdapter {
 	 * streams-on-mesos script and are passed through the StreamsResourceServer
 	 * which it executes and which in turn constructs this class
 	 */
-	public StreamsMesosResourceFramework(String[] args) throws StreamsMesosException {
+	public StreamsMesosResourceManager(String[] args) throws StreamsMesosException {
 		LOG.debug("Constructing ResourceManagerAdapter: StreamsMesosResourceFramework");
 		LOG.debug("args: " + Arrays.toString(args));
-		LOG.trace("Enironment: " + envs);
+		LOG.trace("Enironment: " + _envs);
 
-		argsMap.clear();
+		_argsMap.clear();
 		for (int i = 0; i < args.length; i++) {
 			switch (args[i]) {
 			case StreamsMesosConstants.DEPLOY_ARG:
-				deployStreams = true;
-				argsMap.put(args[i], "true");
+				_deployStreams = true;
+				_argsMap.put(args[i], "true");
 				break;
 			case StreamsMesosConstants.MESOS_MASTER_ARG:
 			case StreamsMesosConstants.ZK_ARG:
@@ -101,22 +89,22 @@ public class StreamsMesosResourceFramework extends ResourceManagerAdapter {
 			case StreamsMesosConstants.HOME_DIR_ARG:
 			case StreamsMesosConstants.PROP_FILE_ARG:
 			case StreamsMesosConstants.DOMAIN_ID_ARG:
-				argsMap.put(args[i], args[++i]);
+				_argsMap.put(args[i], args[++i]);
 				break;
 			}
 		}
-		LOG.debug("ArgsMap: " + argsMap);
+		LOG.debug("ArgsMap: " + _argsMap);
 
 		String propsFile = null;
 		// Process Properties FileReader
-		if (argsMap.containsKey(StreamsMesosConstants.PROP_FILE_ARG))
-			propsFile = argsMap.get(StreamsMesosConstants.PROP_FILE_ARG);
+		if (_argsMap.containsKey(StreamsMesosConstants.PROP_FILE_ARG))
+			propsFile = _argsMap.get(StreamsMesosConstants.PROP_FILE_ARG);
 		else
 			propsFile = StreamsMesosConstants.RM_PROPERTIES_FILE;
 		LOG.debug("Reading Properties file from: " + propsFile);
-		props = new Properties();
+		_props = new Properties();
 		try {
-			props.load(new FileReader(propsFile));
+			_props.load(new FileReader(propsFile));
 		} catch (FileNotFoundException e) {
 			LOG.error("Could not find properties file: " + propsFile);
 			throw new StreamsMesosException("Could not find properties file: " + propsFile, e);
@@ -125,9 +113,45 @@ public class StreamsMesosResourceFramework extends ResourceManagerAdapter {
 			throw new StreamsMesosException("IO Error reading the properties file: " + propsFile, e);
 		}
 
-		LOG.debug("Properties file properties: " + props.toString());
+		LOG.debug("Properties file properties: " + _props.toString());
 
 	}
+
+	/**
+	 * @return the _state
+	 */
+	public StreamsMesosState getState() {
+		return _state;
+	}
+
+	/**
+	 * @return the argsMap
+	 */
+	public Map<String, String> getArgsMap() {
+		return _argsMap;
+	}
+
+	/**
+	 * @param argsMap the argsMap to set
+	 */
+	public void setArgsMap(Map<String, String> argsMap) {
+		this._argsMap = argsMap;
+	}
+
+	/**
+	 * @return the props
+	 */
+	public Properties getProps() {
+		return _props;
+	}
+
+	/**
+	 * @param props the props to set
+	 */
+	public void setProps(Properties props) {
+		this._props = props;
+	}
+
 
 	//////////////////////////////////////////////////
 	// Streams ResourceManager Implementation
@@ -141,17 +165,18 @@ public class StreamsMesosResourceFramework extends ResourceManagerAdapter {
 	@Override
 	public void initialize() throws ResourceManagerException {
 		LOG.debug("Initialize();");
-		super.initialize();
 
+		_state = new StreamsMesosState(this);
+		
 		// Provision Streams if necessary
 		// Caution, this can take some time and cause timeouts on slow machines
 		// or workstations that are overloaded
 		// In testing, saw issues where Streams Resource Manager Server would
 		// disconnect client.
-		if (argsMap.containsKey(StreamsMesosConstants.DEPLOY_ARG)) {
+		if (_argsMap.containsKey(StreamsMesosConstants.DEPLOY_ARG)) {
 			try {
 				LOG.info("Deploy flag set.  Calling provisionStreams...");
-				provisionStreams(argsMap, uriList, StreamsMesosConstants.PROVISIONING_SHARED_URI);
+				provisionStreams(_argsMap, _uriList, StreamsMesosConstants.PROVISIONING_SHARED_URI);
 			} catch (StreamsMesosException e) {
 				LOG.info("Caught error from provisionStreams");
 				throw new ResourceManagerException("Initialization of Streams Mesos Failed to provision Streams", e);
@@ -160,8 +185,8 @@ public class StreamsMesosResourceFramework extends ResourceManagerAdapter {
 
 		// Temporary, not sure why constant would ever have the master
 		String master = StreamsMesosConstants.MESOS_MASTER;
-		if (argsMap.containsKey(StreamsMesosConstants.MESOS_MASTER_ARG))
-			master = argsMap.get(StreamsMesosConstants.MESOS_MASTER_ARG);
+		if (_argsMap.containsKey(StreamsMesosConstants.MESOS_MASTER_ARG))
+			master = _argsMap.get(StreamsMesosConstants.MESOS_MASTER_ARG);
 
 		// Setup and register the Mesos Scheduler
 		LOG.info("About to call runMesosScheduler...");
@@ -190,7 +215,7 @@ public class StreamsMesosResourceFramework extends ResourceManagerAdapter {
 	public void close() {
 		LOG.info("StreamsResourceServer called close()");
 		LOG.info("stopping the mesos driver...");
-		Protos.Status driverStatus = driver.stop();
+		Protos.Status driverStatus = _driver.stop();
 		LOG.info("...driver stopped, status: " + driverStatus.toString());
 		super.close();
 	}
@@ -290,8 +315,8 @@ public class StreamsMesosResourceFramework extends ResourceManagerAdapter {
 
 		for (int i = 0; i < count; i++) {
 			// Creates new Resource, queues, and adds to map of all resources
-			StreamsMesosResource smr = createNewSMR(argsMap.get(StreamsMesosConstants.DOMAIN_ID_ARG),
-					argsMap.get(StreamsMesosConstants.ZK_ARG), tags, isMaster);
+			StreamsMesosResource smr = _state.createNewSMR(_argsMap.get(StreamsMesosConstants.DOMAIN_ID_ARG),
+					_argsMap.get(StreamsMesosConstants.ZK_ARG), tags, isMaster, _uriList);
 			// Put it in our local list to wait a little bit of time to see if it gets started
 			newRequestsFromStreams.add(smr);
 		}
@@ -313,7 +338,7 @@ public class StreamsMesosResourceFramework extends ResourceManagerAdapter {
 			AllocateType rType) {
 		// Depending on the type (Synchronous, Asynchronous, Flexible, etc...)
 		// figure out how long to wait
-		int waitTimeSecs = getWaitSecs(rType, props);
+		int waitTimeSecs = getWaitSecs(rType, _props);
 		LOG.info("Waiting for the Streams Mesos Scheduler to allocate and run " + newAllocationRequests.size() + " resources, maxTime: "
 				+ (waitTimeSecs < 0 ? "unbounded" : waitTimeSecs));
 		long endTime = System.currentTimeMillis() + (waitTimeSecs * 1000);
@@ -396,7 +421,7 @@ public class StreamsMesosResourceFramework extends ResourceManagerAdapter {
 	 * @throws ResourceTagException
 	 * @throws ResourceManagerException
 	 */
-	private void convertTags(ResourceTags tags, StreamsMesosResource smr) throws ResourceTagException, ResourceManagerException {
+	public void convertTags(ResourceTags tags, StreamsMesosResource smr) throws ResourceTagException, ResourceManagerException {
 		int cores = -1;
 		int memory = -1;
 		
@@ -461,13 +486,13 @@ public class StreamsMesosResourceFramework extends ResourceManagerAdapter {
 		// LOG.info("URI List: " + uriList.toString());
 		// LOG.info("commandInfo: " + getCommandInfo(uriList));;
 
-		scheduler = new StreamsMesosResourceScheduler(this);
+		_scheduler = new StreamsMesosScheduler(this);
 
 		LOG.info("Creating new MesosSchedulerDriver...");
-		driver = new MesosSchedulerDriver(scheduler, getFrameworkInfo(), mesosMaster);
+		_driver = new MesosSchedulerDriver(_scheduler, getFrameworkInfo(), mesosMaster);
 
 		LOG.info("About to start the mesos scheduler driver...");
-		Protos.Status driverStatus = driver.start();
+		Protos.Status driverStatus = _driver.start();
 		LOG.info("...start returned status: " + driverStatus.toString());
 	}
 
@@ -561,128 +586,5 @@ public class StreamsMesosResourceFramework extends ResourceManagerAdapter {
 		LOG.info("Created URI");
 	}
 
-	/*
-	 * Framework public methods for collaboration with scheduler
-	 */
-
-	/* StreamsMesosResource Container methods */
-
-	// Create a new SMR and put it proper containers
-	synchronized private StreamsMesosResource createNewSMR(String domainId, String zk, ResourceTags tags, boolean isMaster) throws ResourceManagerException {
-		// Create the Resource object (default state is NEW)
-		StreamsMesosResource smr = new StreamsMesosResource(Utils.generateNextId("smr"), domainId, zk, argsMap,
-				uriList);
-
-		smr.setMaster(isMaster);
-		
-		// Set resource needs (Need to integrate with tags soon)
-		double memory = StreamsMesosConstants.RM_MEMORY_DEFAULT;
-		double cores = StreamsMesosConstants.RM_CORES_DEFAULT;
-
-		if (Utils.hasProperty(props, StreamsMesosConstants.PROPS_DC_MEMORY))
-			memory = Utils.getDoubleProperty(props, StreamsMesosConstants.PROPS_DC_MEMORY);
-
-		if (Utils.hasProperty(props, StreamsMesosConstants.PROPS_DC_CORES))
-			cores = Utils.getDoubleProperty(props, StreamsMesosConstants.PROPS_DC_CORES);
-		smr.setMemory(memory);
-		smr.setCpu(cores);
-
-		// Set the resource tags
-		if (tags != null) {
-			convertTags(tags, smr); // may set mem/cpu from the tags if they are specified
-			smr.getTags().addAll(tags.getNames());
-		}
-		
-		
-		// Add to collections to track
-		LOG.info("Queuing new Resource Request: " + smr.toString());
-		newRequests.add(smr);
-		allResources.put(smr.getId(), smr);
-
-		return smr;
-	}
-
-	// Return list of new Reqeusts as an immutable list
-	public List<StreamsMesosResource> getNewRequestList() {
-		return newRequests;
-	}
-
-	// Update SMR and maintain lists
-	// Eventually pass what to update it with
-	synchronized public void updateSMRbyTaskId(String taskId, StreamsMesosResource.StreamsMesosResourceState newState) {
-		LOG.info("updateSMRbyTaskId(" + taskId + ", " + newState.toString());
-		LOG.debug("updateSMRbyTaskId.allResources: " + allResources.toString());
-		boolean foundMatch = false;
-		for (StreamsMesosResource smr : allResources.values()) {
-			if (smr.getTaskId().equals(taskId)) {
-				foundMatch = true;
-				updateSMR(smr.getId(),newState);
-			} 
-		}
-		if (!foundMatch) {
-			LOG.warn("Update of SMR by TaskId Failed because SMR Not found (TaskID: " + taskId + ", newstate: " + newState.toString() + ")");
-		}
-	}
-	
-	// Update the SMR status 
-	// Need to handle these appropriately because we have concurrency issues of iterating in the scheduler
-	// and calling this to update the list
-	synchronized public void updateSMR(String id, StreamsMesosResource.StreamsMesosResourceState newState) {
-		LOG.info("updateSMR(" + id + ", " + newState.toString());
-		LOG.debug("updateSMR.allResources: " + allResources.toString());
-		StreamsMesosResource smr = null;
-		//StreamsMesosResource.StreamsMesosResourceState oldState;
-		// Find it in the list of all StreamsMesosResources
-		if (allResources.containsKey(id)) {
-			smr = allResources.get(id);
-			//oldState = smr.getState();
-			
-			// Update state
-			smr.setState(newState);
-		} else {
-			LOG.warn("Update of SMR Failed because SMR Not found ((id: " + id + ", newstate: " + newState.toString() + ")");
-		}
-
-	}
-
-	/*
-	 * Create the CommandInfo for initiating a Streams Resource Question: May
-	 * need a second version for differences between master streams resource
-	 * (when domain is started) and all others
-	 */
-	/*
-	public CommandInfo getStreamsResourceCommand() {
-
-		CommandInfo.Builder cmdInfoBuilder = Protos.CommandInfo.newBuilder();
-
-		// Create command, depends on deployment mechanism
-		StringBuffer cmdBuffer = new StringBuffer();
-
-		cmdBuffer.append("echo 'Setting up Streams Environment'");
-		if (argsMap.containsKey(StreamsMesosConstants.DEPLOY_ARG)) {
-			// run the streams resource installer
-			// create softlink for StreamsLink
-		} else {
-			// if --deploy not set, we assume streams is installed on all
-			// machines
-			String streamsInstall = argsMap.get(StreamsMesosConstants.INSTALL_PATH_ARG);
-			cmdBuffer.append(";ln -s " + streamsInstall + " StreamsLink");
-		}
-		// Source streams install path
-		cmdBuffer.append(";source StreamsLink/bin/streamsprofile.sh");
-
-		// Verify Streamtool version
-		cmdBuffer.append(";echo 'Streamtool version:'");
-		cmdBuffer.append(";streamtool version");
-
-		// Set command string
-		cmdInfoBuilder.setValue(cmdBuffer.toString());
-
-		// Add URI's (if any)
-		cmdInfoBuilder.addAllUris(uriList);
-
-		return cmdInfoBuilder.build();
-	}
-	*/
 	
 }

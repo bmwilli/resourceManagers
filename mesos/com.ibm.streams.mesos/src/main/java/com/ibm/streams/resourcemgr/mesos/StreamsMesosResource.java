@@ -16,13 +16,6 @@ import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.CommandInfo;
 import org.apache.mesos.Protos.Resource;
 
-/*
-import org.apache.hadoop.yarn.api.ApplicationConstants;
-import org.apache.hadoop.yarn.api.records.Priority;
-import org.apache.hadoop.yarn.api.records.Resource;
-import org.apache.hadoop.yarn.client.api.AMRMClient.ContainerRequest;
-import org.apache.hadoop.yarn.util.Records;
-*/
 import com.ibm.streams.resourcemgr.ResourceDescriptor;
 import com.ibm.streams.resourcemgr.ResourceDescriptorState;
 import com.ibm.streams.resourcemgr.ResourceManagerUtilities;
@@ -62,87 +55,84 @@ class StreamsMesosResource {
 
 	// Unique Identier used for identification within Framework and for Mesos
 	// Task ID
-	private String id;
+	private String _id;
 	// Streams related members
-	private String domainId = null;
-	private String zkConnect = null;
+	private String _domainId = null;
+	private String _zkConnect = null;
 	// Need to understand more about how this is used within containers
 	// Was getting error about key not found, os went with Yarn RM approach to test
-	private String homeDir = null;
-	private StreamsMesosResourceState state = StreamsMesosResourceState.NEW;
-	private Set<String> tags = new HashSet<String>();
+	private String _homeDir = null;
+	private StreamsMesosResourceState _resourceState = StreamsMesosResourceState.NEW;
+	private Set<String> _tags = new HashSet<String>();
 
-	private boolean deployStreams;
-	private Map<String, String> argsMap;
-	private List<Protos.CommandInfo.URI> uriList;
+	private boolean _deployStreams;
+	private Map<String, String> _argsMap;
+	private List<Protos.CommandInfo.URI> _uriList;
 
 	// Resource utilization related members
-	private double memory = -1;
-	private double cpu = -1;
-	//private int priority = -1;
+	private double _memory = -1;
+	private double _cpu = -1;
 
-	// private ContainerRequest request ;
-	// private ContainerWrapper allocatedContainer = null;
-	private boolean isMaster = false;
-	private boolean cancelled = false;
+	private boolean _isMaster = false;
+	private boolean _cancelled = false;
 
 	// Mesos Task related members
-	private String taskId = null;
-	private String hostName = null;
+	private String _taskId = null;
+	private String _hostName = null;
 	
 	
 	
 	//public StreamsMesosResource(String id, String domainId, String zk, int priority, Map<String, String> argsMap,
 	public StreamsMesosResource(String id, String domainId, String zk, Map<String, String> argsMap,
 			List<Protos.CommandInfo.URI> uriList) {
-		this.id = id;
-		this.domainId = domainId;
-		this.zkConnect = zk;
+		this._id = id;
+		this._domainId = domainId;
+		this._zkConnect = zk;
 		//this.priority = priority;
-		this.argsMap = argsMap;
-		this.uriList = uriList;
+		this._argsMap = argsMap;
+		this._uriList = uriList;
 		if (argsMap.containsKey(StreamsMesosConstants.HOME_DIR_ARG))
-			homeDir = argsMap.get(StreamsMesosConstants.HOME_DIR_ARG);
+			_homeDir = argsMap.get(StreamsMesosConstants.HOME_DIR_ARG);
 	}
 
 	public String getId() {
-		return id;
+		return _id;
 	}
 
 	public String getDomainId() {
-		return domainId;
+		return _domainId;
 	}
 
 	public String getZkConnect() {
-		return zkConnect;
+		return _zkConnect;
 	}
 
 	public boolean isMaster() {
-		return isMaster;
+		return _isMaster;
 	}
 
 	public void setMaster(boolean isMaster) {
-		this.isMaster = isMaster;
+		this._isMaster = isMaster;
 	}
 
 	public double getMemory() {
-		return memory;
+		return _memory;
 	}
 
 	public void setMemory(double memory) {
-		this.memory = memory;
+		this._memory = memory;
 	}
 
 	public double getCpu() {
-		return cpu;
+		return _cpu;
 	}
 
 	public void setCpu(double cpu) {
-		this.cpu = cpu;
+		this._cpu = cpu;
 	}
 
 	public Set<String> getTags() {
-		return tags;
+		return _tags;
 	}
 	
 	
@@ -151,28 +141,28 @@ class StreamsMesosResource {
 	 * @return the homeDir
 	 */
 	public String getHomeDir() {
-		return homeDir;
+		return _homeDir;
 	}
 
 	/**
 	 * @param homeDir the homeDir to set
 	 */
 	public void setHomeDir(String homeDir) {
-		this.homeDir = homeDir;
+		this._homeDir = homeDir;
 	}
 
 	/**
 	 * @return the state
 	 */
 	public StreamsMesosResourceState getState() {
-		return state;
+		return _resourceState;
 	}
 
 	/**
 	 * @param state the state to set
 	 */
 	public void setState(StreamsMesosResourceState state) {
-		this.state = state;
+		this._resourceState = state;
 	}
 	
 	
@@ -181,38 +171,38 @@ class StreamsMesosResource {
 	 * @return the taskId
 	 */
 	public String getTaskId() {
-		return taskId;
+		return _taskId;
 	}
 
 	/**
 	 * @param taskId the taskId to set
 	 */
 	public void setTaskId(String taskId) {
-		this.taskId = taskId;
+		this._taskId = taskId;
 	}
 	
 	public String getHostName() {
-		return hostName;
+		return _hostName;
 	}
 
 	public void setHostName(String hostName) {
-		this.hostName = hostName;
+		this._hostName = hostName;
 	}
 
 	public boolean isRunning() {
 		// Fix for mesos
-		return state == StreamsMesosResourceState.RUNNING;
+		return _resourceState == StreamsMesosResourceState.RUNNING;
 	}
 
 	public void cancel() {
-		cancelled = true;
+		_cancelled = true;
 		// Fix for mesos
 		// if(allocatedContainer!=null)
 		// allocatedContainer.cancel();
 	}
 
 	public boolean isCancelled() {
-		return cancelled;
+		return _cancelled;
 	}
 
 	/*
@@ -231,11 +221,11 @@ class StreamsMesosResource {
 	public ResourceDescriptor getDescriptor() {
 		// if(allocatedContainer != null)
 		// return allocatedContainer.getDescriptor();
-		return StreamsMesosResourceFramework.getDescriptor(id, getHostName());
+		return StreamsMesosResourceManager.getDescriptor(_id, getHostName());
 	}
 
 	public ResourceDescriptorState getDescriptorState() {
-		return StreamsMesosResourceFramework.getDescriptorState(isRunning(), getDescriptor());
+		return StreamsMesosResourceManager.getDescriptorState(isRunning(), getDescriptor());
 	}
 
 	// OLD UNUSED FROM YARN
@@ -315,13 +305,13 @@ class StreamsMesosResource {
 			//cmdBuffer.append(";export HOME=${MESOS_SANDBOX}");
 			cmdBuffer.append("; export HOME=" + getHomeDir());
 
-		if (argsMap.containsKey(StreamsMesosConstants.DEPLOY_ARG)) {
+		if (_argsMap.containsKey(StreamsMesosConstants.DEPLOY_ARG)) {
 			// run the streams resource installer
 			// create softlink for StreamsLink
 		} else {
 			// if --deploy not set, we assume streams is installed on all
 			// machines
-			String streamsInstall = argsMap.get(StreamsMesosConstants.INSTALL_PATH_ARG);
+			String streamsInstall = _argsMap.get(StreamsMesosConstants.INSTALL_PATH_ARG);
 			cmdBuffer.append(";ln -s " + streamsInstall + " StreamsLink");
 		}
 		// Source streams install path
@@ -338,7 +328,7 @@ class StreamsMesosResource {
 		cmdInfoBuilder.setValue(cmdBuffer.toString());
 
 		// Add URI's (if any)
-		cmdInfoBuilder.addAllUris(uriList);
+		cmdInfoBuilder.addAllUris(_uriList);
 
 		return cmdInfoBuilder.build();
 	}
@@ -398,10 +388,10 @@ class StreamsMesosResource {
 
 	@Override
 	public String toString() {
-		return "StreamsMesosResource [id=" + id + ", state=" + state + ", domainId=" + domainId + ", zkConnect="
-				+ zkConnect + ", memory=" + memory + ", cpu=" + cpu + ", isMaster="
-				+ isMaster + ", cancelled=" + cancelled + ", tags=" + tags
-				+ ", taskId=" + taskId + ", hostName=" + hostName
+		return "StreamsMesosResource [id=" + _id + ", state=" + _resourceState + ", domainId=" + _domainId + ", zkConnect="
+				+ _zkConnect + ", memory=" + _memory + ", cpu=" + _cpu + ", isMaster="
+				+ _isMaster + ", cancelled=" + _cancelled + ", tags=" + _tags
+				+ ", taskId=" + _taskId + ", hostName=" + _hostName
 				// + ", allocatedContainer=" + allocatedContainer
 				+ "]";
 	}
