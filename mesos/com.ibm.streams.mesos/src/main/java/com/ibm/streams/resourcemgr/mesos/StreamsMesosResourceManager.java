@@ -55,7 +55,7 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 	private Map<String, String> _envs = System.getenv();
 	private Map<String, String> _argsMap = new HashMap<String, String>();
 	private Properties _props = null;
-	private Scheduler _scheduler;
+	private StreamsMesosScheduler _scheduler;
 	private MesosSchedulerDriver _driver;
 	private List<Protos.CommandInfo.URI> _uriList = new ArrayList<Protos.CommandInfo.URI>();
 	private boolean _deployStreams = false;
@@ -190,18 +190,10 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 
 		// Setup and register the Mesos Scheduler
 		LOG.info("About to call runMesosScheduler...");
-		// runMesosScheduler(uriList,master);
+
 		runMesosScheduler(master);
 
-		// LOG.info("*** calling waitForTestMessage()...");
-		// waitForTestMessage();
-
 		LOG.info("StreamsMesosResourceFramework.initialize() complete");
-
-		// LOG.info("Creating a test master...");
-		// StreamsMesosResource smr =
-		// createNewSMR(argsMap.get(StreamsMesosConstants.DOMAIN_ID_ARG),
-		// argsMap.get(StreamsMesosConstants.ZK_ARG), 1, true);
 
 	}
 
@@ -242,6 +234,195 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
         }
     }
 
+
+
+	/*
+	 * Create master resource. This resource is the first resource requested by
+	 * Streams and is requested when the streams domain starts
+	 * 
+	 * @see
+	 * com.ibm.streams.resourcemgr.ResourceManagerAdapter#allocateMasterResource
+	 * (com.ibm.streams.resourcemgr.ClientInfo,
+	 * com.ibm.streams.resourcemgr.AllocateMasterInfo)
+	 */
+	@Override
+	public ResourceDescriptor allocateMasterResource(ClientInfo clientInfo, AllocateMasterInfo request)
+			throws ResourceTagException, ResourceManagerException {
+		LOG.info("#################### allocate master start ####################");
+		LOG.info("Request: " + request);
+		LOG.info("ClientInfo: " + clientInfo);
+		
+		ResourceDescriptor descriptor = null;
+		
+		List<ResourceDescriptorState> lst = allocateResources(clientInfo, true, 1, request.getTags(),
+				AllocateType.SYNCHRONOUS);
+		if (lst.size() == 0)
+			throw new ResourceManagerException("Streams Mesos Resource Manager could not allocate master resource");
+		
+		descriptor =  lst.get(0).getDescriptor();
+
+		LOG.info("#################### allocate master end ####################");
+
+		return descriptor;
+	}
+
+	/*
+	 * Create non-master resources. These resources are used for Streams
+	 * instances
+	 * 
+	 * @see
+	 * com.ibm.streams.resourcemgr.ResourceManagerAdapter#allocateResources(com.
+	 * ibm.streams.resourcemgr.ClientInfo,
+	 * com.ibm.streams.resourcemgr.AllocateInfo)
+	 */
+	@Override
+	public Collection<ResourceDescriptorState> allocateResources(ClientInfo clientInfo, AllocateInfo request)
+			throws ResourceTagException, ResourceManagerException {
+		LOG.info("################### allocate start ###################");
+		LOG.info("Request: " + request);
+		LOG.info("ClientInfo: " + clientInfo);
+		
+		Collection<ResourceDescriptorState> states = new ArrayList<ResourceDescriptorState>();
+		
+		states = allocateResources(clientInfo, false, request.getCount(), request.getTags(), request.getType());
+
+		
+		LOG.info("################### allocate end ###################");
+
+		return states;
+
+	}
+	
+	/**
+	 * Releases specified resources that are allocated 
+	 *
+	 * (non-Javadoc)
+	 * @see com.ibm.streams.resourcemgr.ResourceManagerAdapter#releaseResources(com.ibm.streams.resourcemgr.ClientInfo, java.util.Collection, java.util.Locale)
+	 */
+	@Override
+	public void releaseResources(ClientInfo client, Collection<ResourceDescriptor> descriptors, Locale locale)
+			throws ResourceManagerException {
+
+		LOG.info("################ release specified resources start ################");
+		LOG.info("client: " + client);;
+		LOG.info("descriptors: " + descriptors);
+		LOG.info("locale: " + locale);
+		for (ResourceDescriptor rd : descriptors) {
+			if (!_state.getAllResources().containsKey(rd.getNativeResourceId()))
+				throw new ResourceManagerException("No such resource: " + rd.getNativeResourceId());
+			StreamsMesosResource smr = _state.getAllResources().get(rd.getNativeResourceId());
+			smr.stop(_scheduler);
+		}
+		
+		LOG.info("################ release specified resources end ################");
+
+	}
+
+	/**
+	 * Releases all resources for the given client
+	 * NOTE: At this time has not been tested or coded for multiple clients
+	 * 
+	 * (non-Javadoc)
+	 * @see com.ibm.streams.resourcemgr.ResourceManagerAdapter#releaseResources(com.ibm.streams.resourcemgr.ClientInfo, java.util.Locale)
+	 */
+	@Override
+	public void releaseResources(ClientInfo client, Locale locale) throws ResourceManagerException {
+		LOG.info("################ release all client resources start ################");
+		LOG.info("client: " + client);;
+		LOG.info("locale: " + locale);
+		for (StreamsMesosResource smr : _state.getAllResources().values()) {
+			smr.stop(_scheduler);
+		}
+		
+		LOG.info("################ release all client resources end ################");
+	}
+
+	
+
+	/////////////////////////////////////////////
+	/// MESOS FRAMEWORK INTEGRATION
+	/////////////////////////////////////////////
+
+
+
+	private static FrameworkInfo getFrameworkInfo() {
+		FrameworkInfo.Builder builder = FrameworkInfo.newBuilder();
+		builder.setFailoverTimeout(120000);
+		builder.setUser("");
+		builder.setName(StreamsMesosConstants.FRAMEWORK_NAME);
+		return builder.build();
+	}
+
+	private void runMesosScheduler(String mesosMaster) {
+		// private void runMesosScheduler(List<CommandInfo.URI>uriList, String
+		// mesosMaster) {
+		LOG.info("Creating new Mesos Scheduler...");
+		// LOG.info("URI List: " + uriList.toString());
+		// LOG.info("commandInfo: " + getCommandInfo(uriList));;
+
+		_scheduler = new StreamsMesosScheduler(this);
+
+		LOG.info("Creating new MesosSchedulerDriver...");
+		_driver = new MesosSchedulerDriver(_scheduler, getFrameworkInfo(), mesosMaster);
+
+		LOG.info("About to start the mesos scheduler driver...");
+		Protos.Status driverStatus = _driver.start();
+		LOG.info("...start returned status: " + driverStatus.toString());
+	}
+
+
+	
+	///////////////////////////////////////////////
+	/// PRIVATE METHODS
+	///////////////////////////////////////////////
+	
+	/** 
+	 * @param tags
+	 * @param smr
+	 * @throws ResourceTagException
+	 * @throws ResourceManagerException
+	 */
+	public void convertTags(ResourceTags tags, StreamsMesosResource smr) throws ResourceTagException, ResourceManagerException {
+		int cores = -1;
+		int memory = -1;
+		
+		for (String tag : tags.getNames()) {
+			try {
+				TagDefinitionType definitionType = tags.getTagDefinitionType(tag);
+				
+				switch (definitionType) {
+				case NONE:
+					// use default definition (probably just a name tag (e.g. AUDIT)
+					break;
+				case PROPERTIES:
+					Properties propsDef = tags.getDefinitionAsProperties(tag);
+					LOG.trace("Tag=" + tag + " props=" + propsDef.toString());
+					if (propsDef.containsKey(StreamsMesosConstants.MEMORY_TAG)) {
+						memory = Math.max(memory,  Utils.getIntProperty(propsDef, StreamsMesosConstants.MEMORY_TAG));
+						LOG.trace("Tag=" + tag + " memory=" + memory);
+					}
+					if (propsDef.containsKey(StreamsMesosConstants.CORES_TAG)) {
+						cores = Math.max(cores,  Utils.getIntProperty(propsDef, StreamsMesosConstants.CORES_TAG));
+						LOG.trace("Tag=" + tag + " cores=" + cores);
+					}
+					break;
+				default:
+					throw new ResourceTagException("Tag=" + tag + " has unsupported tag definition type=" + definitionType);
+				}
+			} catch (ResourceException rs) {
+				throw new ResourceManagerException(rs);
+			}
+		}
+		
+		// Override memory and cores if they were set by the tags
+		if (memory != -1){
+			smr.setMemory(memory);
+		}
+		if (cores != -1) {
+			smr.setCpu(cores);
+		}
+	}
+	
     private void validateTagAttribute(String tag, String key, Object valueObj) throws ResourceTagException {
         //memory, cores
         if (key.equals(StreamsMesosConstants.MEMORY_TAG) || key.equals(StreamsMesosConstants.CORES_TAG)) {
@@ -260,48 +441,7 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
             throw new ResourceTagException("Tag: " + tag + " contains an unsupported attribute");
         }
     }
-
-	/*
-	 * Create master resource. This resource is the first resource requested by
-	 * Streams and is requested when the streams domain starts
-	 * 
-	 * @see
-	 * com.ibm.streams.resourcemgr.ResourceManagerAdapter#allocateMasterResource
-	 * (com.ibm.streams.resourcemgr.ClientInfo,
-	 * com.ibm.streams.resourcemgr.AllocateMasterInfo)
-	 */
-	@Override
-	public ResourceDescriptor allocateMasterResource(ClientInfo clientInfo, AllocateMasterInfo request)
-			throws ResourceTagException, ResourceManagerException {
-		LOG.info("StreamsResourceServer called allocateMasterResource()");
-		LOG.info("Request: " + request);
-		LOG.info("ClientInfo: " + clientInfo);
-		List<ResourceDescriptorState> lst = allocateResources(clientInfo, true, 1, request.getTags(),
-				AllocateType.SYNCHRONOUS);
-		if (lst.size() == 0)
-			throw new ResourceManagerException("Streams Mesos Resource Manager could not allocate master resource");
-		return lst.get(0).getDescriptor();
-	}
-
-	/*
-	 * Create non-master resources. These resources are used for Streams
-	 * instances
-	 * 
-	 * @see
-	 * com.ibm.streams.resourcemgr.ResourceManagerAdapter#allocateResources(com.
-	 * ibm.streams.resourcemgr.ClientInfo,
-	 * com.ibm.streams.resourcemgr.AllocateInfo)
-	 */
-	@Override
-	public Collection<ResourceDescriptorState> allocateResources(ClientInfo clientInfo, AllocateInfo request)
-			throws ResourceTagException, ResourceManagerException {
-		LOG.info("StreamsResourceServer called allocateResources()");
-		LOG.info("Request: " + request);
-		LOG.info("ClientInfo: " + clientInfo);
-		return allocateResources(clientInfo, false, request.getCount(), request.getTags(), request.getType());
-
-	}
-
+    
 	/*
 	 * Create resources helper for both master and regular resources
 	 *
@@ -401,103 +541,11 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 			throw new RuntimeException("Unhandled Streams AllocateType: " + rType);
 		}
 	}
-
-	/*** Streams Resource Manager Helper Functions ***/
-
-	static ResourceDescriptor getDescriptor(String id, String host) {
-		return new ResourceDescriptor(StreamsMesosConstants.RESOURCE_TYPE, ResourceKind.CONTAINER, id,
-				StreamsMesosConstants.RESOURCE_TYPE + "_" + id, host);
-
-	}
-
-	static ResourceDescriptorState getDescriptorState(boolean isRunning, ResourceDescriptor rd) {
-		AllocateState s = isRunning ? AllocateState.ALLOCATED : AllocateState.PENDING;
-		return new ResourceDescriptorState(s, rd);
-	}
 	
-	/** 
-	 * @param tags
-	 * @param smr
-	 * @throws ResourceTagException
-	 * @throws ResourceManagerException
-	 */
-	public void convertTags(ResourceTags tags, StreamsMesosResource smr) throws ResourceTagException, ResourceManagerException {
-		int cores = -1;
-		int memory = -1;
-		
-		for (String tag : tags.getNames()) {
-			try {
-				TagDefinitionType definitionType = tags.getTagDefinitionType(tag);
-				
-				switch (definitionType) {
-				case NONE:
-					// use default definition (probably just a name tag (e.g. AUDIT)
-					break;
-				case PROPERTIES:
-					Properties propsDef = tags.getDefinitionAsProperties(tag);
-					LOG.trace("Tag=" + tag + " props=" + propsDef.toString());
-					if (propsDef.containsKey(StreamsMesosConstants.MEMORY_TAG)) {
-						memory = Math.max(memory,  Utils.getIntProperty(propsDef, StreamsMesosConstants.MEMORY_TAG));
-						LOG.trace("Tag=" + tag + " memory=" + memory);
-					}
-					if (propsDef.containsKey(StreamsMesosConstants.CORES_TAG)) {
-						cores = Math.max(cores,  Utils.getIntProperty(propsDef, StreamsMesosConstants.CORES_TAG));
-						LOG.trace("Tag=" + tag + " cores=" + cores);
-					}
-					break;
-				default:
-					throw new ResourceTagException("Tag=" + tag + " has unsupported tag definition type=" + definitionType);
-				}
-			} catch (ResourceException rs) {
-				throw new ResourceManagerException(rs);
-			}
-		}
-		
-		// Override memory and cores if they were set by the tags
-		if (memory != -1){
-			smr.setMemory(memory);
-		}
-		if (cores != -1) {
-			smr.setCpu(cores);
-		}
-	}
-
-	/***** MESOS PRIVATE SUPPORT METHODS *****/
-
-	private static FrameworkInfo getFrameworkInfo() {
-		FrameworkInfo.Builder builder = FrameworkInfo.newBuilder();
-		builder.setFailoverTimeout(120000);
-		builder.setUser("");
-		builder.setName(StreamsMesosConstants.FRAMEWORK_NAME);
-		return builder.build();
-	}
-/*
-	private static CommandInfo getCommandInfo(List<CommandInfo.URI> uriList) {
-		CommandInfo.Builder cmdInfoBuilder = Protos.CommandInfo.newBuilder();
-		cmdInfoBuilder.addAllUris(uriList);
-		cmdInfoBuilder.setValue(getStreamsShellCommand());
-		return cmdInfoBuilder.build();
-	}
-*/
-	private void runMesosScheduler(String mesosMaster) {
-		// private void runMesosScheduler(List<CommandInfo.URI>uriList, String
-		// mesosMaster) {
-		LOG.info("Creating new Mesos Scheduler...");
-		// LOG.info("URI List: " + uriList.toString());
-		// LOG.info("commandInfo: " + getCommandInfo(uriList));;
-
-		_scheduler = new StreamsMesosScheduler(this);
-
-		LOG.info("Creating new MesosSchedulerDriver...");
-		_driver = new MesosSchedulerDriver(_scheduler, getFrameworkInfo(), mesosMaster);
-
-		LOG.info("About to start the mesos scheduler driver...");
-		Protos.Status driverStatus = _driver.start();
-		LOG.info("...start returned status: " + driverStatus.toString());
-	}
-
-	/***** STREAMS PROVISIONING METHODS *****/
-
+	///////////////////////////////////////////////
+	// STREAMS PROVISIONING METHODS
+	///////////////////////////////////////////////
+	
 	/*
 	 * If we are not going to pre-install Streams, then we need to ensure it is
 	 * fetched by the executor
@@ -585,6 +633,22 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 		uriList.add(uriBuilder.build());
 		LOG.info("Created URI");
 	}
+	
+	
+	//////////////////////////////////////
+	/// STATIC METHODS
+	//////////////////////////////////////
 
+	static ResourceDescriptor getDescriptor(String id, String host) {
+		return new ResourceDescriptor(StreamsMesosConstants.RESOURCE_TYPE, ResourceKind.CONTAINER, id,
+				StreamsMesosConstants.RESOURCE_TYPE + "_" + id, host);
+
+	}
+
+	static ResourceDescriptorState getDescriptorState(boolean isRunning, ResourceDescriptor rd) {
+		AllocateState s = isRunning ? AllocateState.ALLOCATED : AllocateState.PENDING;
+		return new ResourceDescriptorState(s, rd);
+	}
+	
 	
 }

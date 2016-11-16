@@ -34,6 +34,7 @@ streamtool mkdomain --property domain.externalResourceManager=mesos
 * How does Descriptor ResourceKind {CONTAINER, UNKNOWN, PHYSICAL_HOST,...} field impact how it is used?
 
 ## Future:
+* Handle multiple multiple clients (e.g. multiple domains)
 * Ability to run Mesos Resource Manager as root or a user
   * root would allow easier authentication with pam (security.runAsRoot)
   * user would limit to single user if pam authentication used

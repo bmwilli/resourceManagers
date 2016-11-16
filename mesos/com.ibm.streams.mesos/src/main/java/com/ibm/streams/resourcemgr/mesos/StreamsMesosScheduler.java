@@ -37,6 +37,7 @@ public class StreamsMesosScheduler implements Scheduler {
 	 */
 	StreamsMesosResourceManager _manager;
 	StreamsMesosState _state;
+	SchedulerDriver _schedulerDriver = null;
 
 	/**
 	 * @param streamsRM
@@ -114,8 +115,9 @@ public class StreamsMesosScheduler implements Scheduler {
 	 */
 	@Override
 	public void registered(SchedulerDriver schedulerDriver, FrameworkID frameworkID, MasterInfo masterInfo) {
-		LOG.debug("Registered: " + frameworkID);
+		LOG.debug("Scheduler Registered: " + frameworkID);
 
+		_schedulerDriver = schedulerDriver;
 		// LOG.debug("*** StreamsMesosResourceScheduler Registered !!");
 		// LOG.debug("*** Try and notify framework....");
 		// LOG.debug("*** calling streamsRM.testMessage()...returned: " +
@@ -193,7 +195,7 @@ public class StreamsMesosScheduler implements Scheduler {
 					satisfiedRequests.add(smr);
 					// Tell resource manager we have satisfied the request and
 					// status
-					_state.updateSMR(smr.getId(), StreamsMesosResource.StreamsMesosResourceState.LAUNCHED);	
+					_state.updateResource(smr.getId(), StreamsMesosResource.StreamsMesosResourceState.LAUNCHED);	
 
 				} else {
 					LOG.info("Offer did not meet requirements, maybe the next offer will.");
@@ -219,6 +221,12 @@ public class StreamsMesosScheduler implements Scheduler {
 		tasks.add(task);
 		offerIDs.add(offer.getId());
 		schedulerDriver.launchTasks(offerIDs, tasks);
+	}
+	
+	public void killTask(Protos.TaskID taskId) {
+		LOG.info("Calling _schedulerDriver.killTask(" + taskId + ")");
+		Protos.Status status = _schedulerDriver.killTask(taskId);
+		LOG.info("killTask returned driver status: " + status.toString());
 	}
 
 	/*
@@ -272,7 +280,7 @@ public class StreamsMesosScheduler implements Scheduler {
 		// changed
 		if (newState != null) {
 			LOG.info("Mesos Task Status Update mapped to Resource State: " + newState.toString() );
-			_state.updateSMRbyTaskId(taskStatus.getTaskId().getValue(), newState);
+			_state.updateResourceByTaskId(taskStatus.getTaskId().getValue(), newState);
 		} else
 			LOG.info("Mesos Task Status Update was not mapped to a Resource State, no action");
 	}

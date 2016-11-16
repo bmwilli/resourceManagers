@@ -87,6 +87,10 @@ public class StreamsMesosState {
 		return smr;
 	}
 	
+	public Map<String, StreamsMesosResource> getAllResources() {
+		return _allResources;
+	}
+	
 	// Return list of new Reqeusts as an immutable list
 	public List<StreamsMesosResource> getNewRequestList() {
 		return _newRequests;
@@ -94,27 +98,27 @@ public class StreamsMesosState {
 	
 	// Update SMR and maintain lists
 	// Eventually pass what to update it with
-	synchronized public void updateSMRbyTaskId(String taskId, StreamsMesosResource.StreamsMesosResourceState newState) {
-		LOG.info("updateSMRbyTaskId(" + taskId + ", " + newState.toString());
-		LOG.debug("updateSMRbyTaskId.allResources: " + _allResources.toString());
+	synchronized public void updateResourceByTaskId(String taskId, StreamsMesosResource.StreamsMesosResourceState newState) {
+		LOG.info("updateResourceByTaskId(" + taskId + ", " + newState.toString());
+		LOG.debug("updateResourceByTaskId.allResources: " + _allResources.toString());
 		boolean foundMatch = false;
 		for (StreamsMesosResource smr : _allResources.values()) {
 			if (smr.getTaskId().equals(taskId)) {
 				foundMatch = true;
-				updateSMR(smr.getId(),newState);
+				updateResource(smr.getId(),newState);
 			} 
 		}
 		if (!foundMatch) {
-			LOG.warn("Update of SMR by TaskId Failed because SMR Not found (TaskID: " + taskId + ", newstate: " + newState.toString() + ")");
+			LOG.warn("Update of Resource by TaskId Failed because SMR Not found (TaskID: " + taskId + ", newstate: " + newState.toString() + ")");
 		}
 	}
 	
 	// Update the SMR status 
 	// Need to handle these appropriately because we have concurrency issues of iterating in the scheduler
 	// and calling this to update the list
-	synchronized public void updateSMR(String id, StreamsMesosResource.StreamsMesosResourceState newState) {
-		LOG.info("updateSMR(" + id + ", " + newState.toString());
-		LOG.debug("updateSMR.allResources: " + _allResources.toString());
+	synchronized public void updateResource(String id, StreamsMesosResource.StreamsMesosResourceState newState) {
+		LOG.info("updateResource(" + id + ", " + newState.toString());
+		LOG.debug("updateResource.allResources: " + _allResources.toString());
 		StreamsMesosResource smr = null;
 		//StreamsMesosResource.StreamsMesosResourceState oldState;
 		// Find it in the list of all StreamsMesosResources
@@ -125,7 +129,7 @@ public class StreamsMesosState {
 			// Update state
 			smr.setState(newState);
 		} else {
-			LOG.warn("Update of SMR Failed because SMR Not found ((id: " + id + ", newstate: " + newState.toString() + ")");
+			LOG.warn("Update of Resource Failed because SMR Not found ((id: " + id + ", newstate: " + newState.toString() + ")");
 		}
 
 	}

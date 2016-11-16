@@ -18,6 +18,7 @@ import org.apache.mesos.Protos.Resource;
 
 import com.ibm.streams.resourcemgr.ResourceDescriptor;
 import com.ibm.streams.resourcemgr.ResourceDescriptorState;
+import com.ibm.streams.resourcemgr.ResourceManagerException;
 import com.ibm.streams.resourcemgr.ResourceManagerUtilities;
 
 import org.slf4j.Logger;
@@ -384,6 +385,33 @@ class StreamsMesosResource {
 
 	private Protos.Value.Scalar.Builder buildScalar(double value) {
 		return Protos.Value.Scalar.newBuilder().setValue(value);
+	}
+	
+	public void stop(StreamsMesosScheduler scheduler) {
+		LOG.info("*** Stopping Resource: " + _id);
+		
+		setState(StreamsMesosResourceState.STOPPING);
+		try {
+			ResourceDescriptor rd = getDescriptor();
+			LOG.info("Stopping Domain Controller: " + rd);
+			boolean clean = false;
+			LOG.info("stopControllerCmd: " + ResourceManagerUtilities.getStopControllerCommandElements(
+					_argsMap.get(StreamsMesosConstants.INSTALL_PATH_ARG), getZkConnect(), getDomainId(), rd, clean));
+			ResourceManagerUtilities.stopController(getZkConnect(), getDomainId(), rd, clean);
+		} catch (ResourceManagerException rme) {
+			LOG.warn("Error shutting down resource streams controller: " + this, rme);
+			rme.printStackTrace();
+		}
+		
+		try {
+			//LOG.info("Stopping Mesos Task: " + getTaskId());
+			// Stop the Mesos task / container
+			// Create taskId
+			Protos.TaskID taskIdProto = Protos.TaskID.newBuilder().setValue(getTaskId()).build();
+			//scheduler.killTask(taskIdProto);
+		} catch (Exception e) {
+			LOG.warn("Error stopping Mesos Task: " + this, e);
+		}
 	}
 
 	@Override
