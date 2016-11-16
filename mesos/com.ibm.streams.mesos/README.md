@@ -7,10 +7,15 @@ streamtool mkdomain --property domain.externalResourceManager=mesos
 ## start mesos manager 
 ./streams-on-mesos start --master zk://172.31.29.41:2181/mesos
 
-## Get status
+## Get status of Mesos Resource Manager
 ./streams-on-mesos status -d StreamsDomain
 
 ## To Do (Working notes to get version 1.0.0 ready)
+* Refactor to pull containers of SMR's into a StreamsMesosState class
+	* StreamsMesosResourceManager
+	* StreamsMesosResource
+	* StreamsMesosResourceScheduler
+	* StreamsMesosResourceState
 * Double check synchronized blocks
 * Track allocated and pending resources and messaging
 * Handle releaseResource() call for all and for specific descriptors
@@ -19,15 +24,6 @@ streamtool mkdomain --property domain.externalResourceManager=mesos
 	* Be able to get this from a StreamsMesosResource object
 * Initial version of --deploy (done)
   * Will come back to this after getting stuff to work
-* Command executor
-  * Run streamtool version - done
-  * Run the controller - working on it...
-* Config file processing
-  * cpu/memory for controllers
-  * test
-* Create command line status
-  * streams-on-mesos status --zkconnect <zookeeper> -d <domain>
-    * Check how symphony passes --status to the ResourceManagerServer (not documented)
 * Validate Stop
   * Prevent shutdown (unless --force) if we have resources being used
 
@@ -38,6 +34,10 @@ streamtool mkdomain --property domain.externalResourceManager=mesos
 * How does Descriptor ResourceKind {CONTAINER, UNKNOWN, PHYSICAL_HOST,...} field impact how it is used?
 
 ## Future:
+* Ability to run Mesos Resource Manager as root or a user
+  * root would allow easier authentication with pam (security.runAsRoot)
+  * user would limit to single user if pam authentication used
+* Instructions and test for PKI authentication
 * Resource packing when offers have more resources that needed (see Building applications on mesos book)
 * If cpu and mem set to -1, then use entire offer for a resource...done
 * Marathon submission of framework

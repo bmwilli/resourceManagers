@@ -8,7 +8,6 @@ import java.util.Collection;
 import java.util.List;
 
 import org.apache.mesos.Protos;
-import org.apache.mesos.Protos.CommandInfo;
 import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.FrameworkID;
 import org.apache.mesos.Protos.MasterInfo;
@@ -20,8 +19,6 @@ import org.apache.mesos.Protos.TaskStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.protobuf.ByteString;
-
 import org.apache.mesos.Scheduler;
 import org.apache.mesos.SchedulerDriver;
 
@@ -32,8 +29,6 @@ import org.apache.mesos.SchedulerDriver;
 public class StreamsMesosResourceScheduler implements Scheduler {
 
 	private static final Logger LOG = LoggerFactory.getLogger(StreamsMesosResourceScheduler.class);
-
-	private int taskIdCounter = 0;
 
 	/**
 	 * Framework that this scheduler communicates with The Framework is the
@@ -155,8 +150,7 @@ public class StreamsMesosResourceScheduler implements Scheduler {
 
 			double offerCpus = 0;
 			double offerMem = 0;
-			// We always need to extract the resource info from the offer.
-			// It's a bit annoying in every language.
+			// Extract the resource info from the offer.
 			for (Resource r : offer.getResourcesList()) {
 				if (r.getName().equals("cpus")) {
 					offerCpus += r.getScalar().getValue();
@@ -166,36 +160,54 @@ public class StreamsMesosResourceScheduler implements Scheduler {
 			}
 
 			LOG.trace("OFFER: {cpu: " + offerCpus + ", mem: " + offerMem + ", id:" + offer.getId() + "}");
-			// Eventually have a version of getNewSMR that allows cpu and memory
-			// to be sent in so we can find the one that matches what we want
-			StreamsMesosResource smr;
-			while ((smr = streamsRM.getNewSMR()) != null) {
-				boolean satisfiedRequest = false;
-				LOG.info("Streams Mesos Scheduler: New Resource Request Found");
+
+			// Get the list of new requests from the Framework
+			List<StreamsMesosResource> newRequestList = streamsRM.getNewRequestList();
+			// Create List of Requests that we satisfied
+			List<StreamsMesosResource> satisfiedRequests = new ArrayList<StreamsMesosResource>();
+			
+			if (newRequestList.size() > 0)
+				LOG.info("resourceOffers found " + newRequestList.size() + " Resource Requests");
+			
+			// Not packing multiple launches into an offer at this time so that we spread
+			// the resources across multiple Mesos slaves.
+			for (StreamsMesosResource smr : newRequestList) {
+			
+				LOG.info("Resource Request Available to compare to offer:");
 				LOG.info("smr: " + smr.toString());
 				LOG.info("offer: {cpu: " + offerCpus + ", mem: " + offerMem + ", id:" + offer.getId() + "}");
-				LOG.info("Should check to see if we can satisfy with what is left in the offer");
 				
-				usedOffer = true;
+				// Check to ensure offer can meet this resources requirements
+				// If this logic gets more complicated move to its own function
+				if ((smr.getCpu() <= offerCpus) && (smr.getMemory() <= offerMem)) {
+					LOG.info("Offer meets requirements, building Task...");
+					usedOffer = true;
 				
-				Protos.TaskInfo task = smr.buildStreamsMesosResourceTask(offer);
-				LOG.info("Launching taskId: " + task.getTaskId() + "...");
-				launchTask(schedulerDriver, offer, task);
-				LOG.info("...Launched taskId" + task.getTaskId());
-				satisfiedRequest = true;
+					Protos.TaskInfo task = smr.buildStreamsMesosResourceTask(offer);
+					LOG.info("Launching taskId: " + task.getTaskId() + "...");
+					launchTask(schedulerDriver, offer, task);
+					LOG.info("...Launched taskId" + task.getTaskId());
 
-				if (satisfiedRequest) {
+					satisfiedRequests.add(smr);
 					// Tell resource manager we have satisfied the request and
 					// status
-					streamsRM.updateSMR(smr.getId(), StreamsMesosResource.StreamsMesosResourceState.LAUNCHED);
+					streamsRM.updateSMR(smr.getId(), StreamsMesosResource.StreamsMesosResourceState.LAUNCHED);	
+
+				} else {
+					LOG.info("Offer did not meet requirements, maybe the next offer will.");
 				}
-			} // end while
-				// If offer was not used at all, decline it
+			} // end for each newRequest
+				
+			// Outside of iterator, remove the satisifed requests from the list of new ones
+			newRequestList.removeAll(satisfiedRequests);
+			satisfiedRequests.clear();
+			
+			// If offer was not used at all, decline it
 			if (!usedOffer) {
 				LOG.debug("Offer was not used, declining");
 				schedulerDriver.declineOffer(offer.getId());
 			}
-		} // end for
+		} // end for each offer
 		LOG.trace("Finished handilng offers");
 	}
 

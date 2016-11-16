@@ -13,8 +13,9 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Iterator;
 import java.util.Properties;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -43,7 +44,6 @@ import com.ibm.streams.resourcemgr.ResourceManagerUtilities.ResourceManagerPacka
 import com.ibm.streams.resourcemgr.ResourceTagException;
 import com.ibm.streams.resourcemgr.ResourceTags;
 import com.ibm.streams.resourcemgr.ResourceTags.TagDefinitionType;
-import com.ibm.streams.resourcemgr.exception.ResourceTagMessageException;
 
 /**
  * @author bmwilli
@@ -64,12 +64,15 @@ public class StreamsMesosResourceFramework extends ResourceManagerAdapter {
 	/* StreamsMesosResource containers */
 	// newRequests: Tracks new requests from Streams and checked by scheduler
 	// when new offers arrive
-	private List<StreamsMesosResource> newRequests = new ArrayList<StreamsMesosResource>();
+	// Using concurrent CopyOnWriteArrayList.  It is slower than ArrayList but at the rate that 
+	// we add/remove resources and requests it is more than fast enough and simplifies concurrency
+	private List<StreamsMesosResource> newRequests = new CopyOnWriteArrayList<StreamsMesosResource>();
 
 	// allResources: Tracks all resources no matter what state (e.g. requested,
 	// running, etc.)
 	// indexed by id that we generate
-	private Map<String, StreamsMesosResource> allResources = new HashMap<String, StreamsMesosResource>();
+	// Using concurrentHashMap.  simplifies concurrency between the threads of the this class and the mesos scheduler
+	private Map<String, StreamsMesosResource> allResources = new ConcurrentHashMap<String, StreamsMesosResource>();
 
 	/*
 	 * Constructor NOTE: Arguments passed are not in a reliable order need to
@@ -599,48 +602,45 @@ public class StreamsMesosResourceFramework extends ResourceManagerAdapter {
 		return smr;
 	}
 
-	// Return first from list. This assumes it will be removed from list by
-	// another call
-	synchronized public StreamsMesosResource getNewSMR() {
-		if (newRequests.size() > 0)
-			return newRequests.get(0);
-		else
-			return null;
+	// Return list of new Reqeusts as an immutable list
+	public List<StreamsMesosResource> getNewRequestList() {
+		return newRequests;
 	}
 
 	// Update SMR and maintain lists
 	// Eventually pass what to update it with
 	synchronized public void updateSMRbyTaskId(String taskId, StreamsMesosResource.StreamsMesosResourceState newState) {
+		LOG.info("updateSMRbyTaskId(" + taskId + ", " + newState.toString());
+		LOG.debug("updateSMRbyTaskId.allResources: " + allResources.toString());
+		boolean foundMatch = false;
 		for (StreamsMesosResource smr : allResources.values()) {
 			if (smr.getTaskId().equals(taskId)) {
+				foundMatch = true;
 				updateSMR(smr.getId(),newState);
-			} else {
-				LOG.warn("Update of SMR by TaskId Failed because SMR Not found (TaskID: " + taskId + ")");
-			}
+			} 
+		}
+		if (!foundMatch) {
+			LOG.warn("Update of SMR by TaskId Failed because SMR Not found (TaskID: " + taskId + ", newstate: " + newState.toString() + ")");
 		}
 	}
+	
+	// Update the SMR status 
+	// Need to handle these appropriately because we have concurrency issues of iterating in the scheduler
+	// and calling this to update the list
 	synchronized public void updateSMR(String id, StreamsMesosResource.StreamsMesosResourceState newState) {
+		LOG.info("updateSMR(" + id + ", " + newState.toString());
+		LOG.debug("updateSMR.allResources: " + allResources.toString());
 		StreamsMesosResource smr = null;
-		StreamsMesosResource.StreamsMesosResourceState oldState;
+		//StreamsMesosResource.StreamsMesosResourceState oldState;
 		// Find it in the list of all StreamsMesosResources
 		if (allResources.containsKey(id)) {
 			smr = allResources.get(id);
-			oldState = smr.getState();
-			
-			// If the old state was NEW, remove from the list of newRequeests
-			if (oldState == StreamsMesosResource.StreamsMesosResourceState.NEW) {
-				for (Iterator<StreamsMesosResource> iter = newRequests.listIterator(); iter.hasNext();) {
-					String item_id = iter.next().getId();
-					if (item_id == id) {
-						iter.remove();
-					}
-				}
-			}
+			//oldState = smr.getState();
 			
 			// Update state
 			smr.setState(newState);
 		} else {
-			LOG.warn("Update of SMR Failed because SMR Not found (id: " + id + ")");
+			LOG.warn("Update of SMR Failed because SMR Not found ((id: " + id + ", newstate: " + newState.toString() + ")");
 		}
 
 	}
