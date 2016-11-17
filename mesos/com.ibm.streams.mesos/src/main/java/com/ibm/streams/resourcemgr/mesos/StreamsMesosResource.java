@@ -405,23 +405,21 @@ class StreamsMesosResource {
 			ResourceDescriptor rd = getDescriptor();
 			LOG.info("Stopping Domain Controller: " + rd);
 			boolean clean = false;
-			LOG.info("stopControllerCmd: " + ResourceManagerUtilities.getStopControllerCommandElements(
-					_argsMap.get(StreamsMesosConstants.INSTALL_PATH_ARG), getZkConnect(), getDomainId(), rd, clean));
+			//LOG.info("stopControllerCmd: " + ResourceManagerUtilities.getStopControllerCommandElements(
+			//		_argsMap.get(StreamsMesosConstants.INSTALL_PATH_ARG), getZkConnect(), getDomainId(), rd, clean));
 			ResourceManagerUtilities.stopController(getZkConnect(), getDomainId(), rd, clean);
 		} catch (ResourceManagerException rme) {
 			LOG.warn("Error shutting down resource streams controller: " + this, rme);
 			rme.printStackTrace();
 		}
+
+		// No need to stop anything directly in Mesos since we used the Mesos CommandExecutor
+		// Once the controller exits, the task should exit and status update will be reported
+		// to the scheduler.
 		
-		try {
-			//LOG.info("Stopping Mesos Task: " + getTaskId());
-			// Stop the Mesos task / container
-			// Create taskId
-			Protos.TaskID taskIdProto = Protos.TaskID.newBuilder().setValue(getTaskId()).build();
-			//scheduler.killTask(taskIdProto);
-		} catch (Exception e) {
-			LOG.warn("Error stopping Mesos Task: " + this, e);
-		}
+		// It is there that we will be notified that the task has stopped and will update the
+		// _resourceState to STOPPED
+
 	}
 
 	@Override
@@ -430,7 +428,6 @@ class StreamsMesosResource {
 				+ _zkConnect + ", memory=" + _memory + ", cpu=" + _cpu + ", isMaster="
 				+ _isMaster + ", cancelled=" + _cancelled + ", tags=" + _tags
 				+ ", taskId=" + _taskId + ", hostName=" + _hostName
-				// + ", allocatedContainer=" + allocatedContainer
 				+ "]";
 	}
 }

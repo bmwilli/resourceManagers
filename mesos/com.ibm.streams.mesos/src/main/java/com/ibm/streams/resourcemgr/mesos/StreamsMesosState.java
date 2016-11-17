@@ -26,11 +26,6 @@ public class StreamsMesosState {
 	private StreamsMesosResourceManager _manager;
 
 	/* StreamsMesosResource containers */
-	// newRequests: Tracks new requests from Streams and checked by scheduler
-	// when new offers arrive
-	// Using concurrent CopyOnWriteArrayList.  It is slower than ArrayList but at the rate that 
-	// we add/remove resources and requests it is more than fast enough and simplifies concurrency
-	private List<StreamsMesosResource> _newRequests;
 
 	// allResources: Tracks all resources no matter what state (e.g. requested,
 	// running, etc.)
@@ -38,22 +33,31 @@ public class StreamsMesosState {
 	// Using concurrentHashMap.  simplifies concurrency between the threads of the this class and the mesos scheduler
 	private Map<String, StreamsMesosResource> _allResources;
 	
+	// newRequests: Tracks new requests from Streams and checked by scheduler
+	// when new offers arrive
+	// Using concurrent CopyOnWriteArrayList.  It is slower than ArrayList but at the rate that 
+	// we add/remove resources and requests it is more than fast enough and simplifies concurrency
+	private List<StreamsMesosResource> _newRequests;
 	
+	// pendingRequests: Tracks requests that have been reported back to Streams as PENDING
+	private List<StreamsMesosResource> _pendingRequests;
+
 	
 	/**
 	 * Constructor
 	 */
 	public StreamsMesosState(StreamsMesosResourceManager manager) {
 		_manager = manager;
-		_newRequests = new CopyOnWriteArrayList<StreamsMesosResource>();
 		_allResources = new ConcurrentHashMap<String, StreamsMesosResource>();
+		_newRequests = new CopyOnWriteArrayList<StreamsMesosResource>();
+		_pendingRequests = new CopyOnWriteArrayList<StreamsMesosResource>();
 
 	}
 	
 	
 	
 	// Create a new SMR and put it proper containers
-	synchronized public StreamsMesosResource createNewSMR(String domainId, String zk, ResourceTags tags, boolean isMaster, List<Protos.CommandInfo.URI> uriList) throws ResourceManagerException {
+	synchronized public StreamsMesosResource createNewResource(String domainId, String zk, ResourceTags tags, boolean isMaster, List<Protos.CommandInfo.URI> uriList) throws ResourceManagerException {
 		// Create the Resource object (default state is NEW)
 		StreamsMesosResource smr = new StreamsMesosResource(Utils.generateNextId("smr"), domainId, zk, _manager.getArgsMap(),
 				uriList);

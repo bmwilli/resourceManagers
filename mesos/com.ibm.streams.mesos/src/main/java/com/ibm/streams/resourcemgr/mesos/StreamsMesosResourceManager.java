@@ -448,14 +448,12 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 	 */
 	private List<ResourceDescriptorState> allocateResources(ClientInfo clientInfo, boolean isMaster, int count,
 			ResourceTags tags, AllocateType rType) throws ResourceManagerException, ResourceTagException {
-		// throw new ResourceManagerException("StreamsMesosResourceFramework not
-		// yet implemented");
 
 		List<StreamsMesosResource> newRequestsFromStreams = new ArrayList<StreamsMesosResource>();
 
 		for (int i = 0; i < count; i++) {
 			// Creates new Resource, queues, and adds to map of all resources
-			StreamsMesosResource smr = _state.createNewSMR(_argsMap.get(StreamsMesosConstants.DOMAIN_ID_ARG),
+			StreamsMesosResource smr = _state.createNewResource(_argsMap.get(StreamsMesosConstants.DOMAIN_ID_ARG),
 					_argsMap.get(StreamsMesosConstants.ZK_ARG), tags, isMaster, _uriList);
 			// Put it in our local list to wait a little bit of time to see if it gets started
 			newRequestsFromStreams.add(smr);
