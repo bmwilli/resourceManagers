@@ -1,0 +1,64 @@
+## mkdomain command
+streamtool mkdomain --property domain.externalResourceManager=mesos
+
+## start mesos manager 
+./streams-on-mesos start --master zk://172.31.29.41:2181/mesos
+
+## Get status of Mesos Resource Manager
+./streams-on-mesos status -d StreamsDomain
+
+## Resource Specification Commands
+### Show resource specifications
+streamtool lsresources -l
+### Remove resource specification
+streamtool rmresourcespec 2
+### Add resource specification
+streamtool addresourcespec --numresources 1
+streamtool addresourcespec --numresources 1[exclusive]
+streamtool addresourcespec --numresources 1,ingest
+streamtool addresourcespec --numresources 1,ingest[exclusive]
+
+
+
+## To Do (Working notes to get version 1.0.0 ready)
+* Track allocated and pending resources and messaging
+* Fix naming convention of StreamsMesosResource id, taskId
+	id - should be unique and references the request from streams
+		current: smr_1
+	taskId - is filled in when the task is launched
+		current: mesos_smr_1
+	
+* Double check synchronized blocks
+
+* Handle releaseResource() call for all and for specific descriptors
+* Traverse ResourceDescriptor
+	* Map how fields are used and named
+	* Be able to get this from a StreamsMesosResource object
+* Initial version of --deploy (done)
+  * Will come back to this after getting stuff to work
+* Validate Stop
+  * Prevent shutdown (unless --force) if we have resources being used
+
+
+## Development Questions:
+* What to do if more newRequests than offers can handle?
+* sampleRM had a lot of logic about re-using resources that are already beeing used but were not excluded by the new allocateResources request.  Should we implement that?  When would you do that?  Would we do that in the case that we configured the resource manager to take entire offers?
+* How does Descriptor ResourceKind {CONTAINER, UNKNOWN, PHYSICAL_HOST,...} field impact how it is used?
+
+## Future:
+* Handle multiple multiple clients (e.g. multiple domains)
+* Ability to run Mesos Resource Manager as root or a user
+  * root would allow easier authentication with pam (security.runAsRoot)
+  * user would limit to single user if pam authentication used
+* Instructions and test for PKI authentication
+* Resource packing when offers have more resources that needed (see Building applications on mesos book)
+* If cpu and mem set to -1, then use entire offer for a resource...done
+* Marathon submission of framework
+  * run streams-on-mesos from marathon
+* Streams Resource Manager custom commands to get internal state of allResources list, etc.
+* Web interface to get internal state
+* Persistent State manager - see Symphony Resource Manager
+* High Availability
+* Convert exceptions to ResourceManagerMessageException, did not see the API for that
+* Enhance logging (see Symphony resource manager)
+

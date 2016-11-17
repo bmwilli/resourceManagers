@@ -1,6 +1,45 @@
 # Readme file for setting up Apache Mesos support for IBM® InfoSphere Streams
 This Readme file describes how to install and configure Apache Mesos for InfoSphere® Streams.
 
+Brian M Williams, IBM
+bmwilli@us.ibm.com
+
+# UNDER CONSTRUCTION
+Please understand that code and this README are at a point in time of ongoing initial development.
+See DEVELOP.txt file for notes on what needs to be done
+
+# Design
+The current implementation was inspired by the book <b>"Building Applications on Mesos"</b>
+
+<b>Chapter 4 - Creating a new Framework for Mesos</b> was used as a template and reference
+<br>
+<b>Chapter 5 - Building a Mesos Executor</b> up to the point where it stated "YOU PROBABLY DON'T WANT TO DO THIS".  
+
+## Mesos Approach to Resource Management
+There is often questions and confusion with reagrds to Mesos being a resource manager that makes offers, rather than accepting requests (e.g. YARN).  In most cases (unless there are no resources left available) Mesos makes 
+offers every second.  This is fast enough for the Streams Mesos Resource Manager to handle synchronous resource 
+requests from Streams.
+
+## A Tale of Two Threads - ResourceManagerAdapter and Mesos Scheduler
+There are two primary threads running in this Resource Manager.  The main class, StreamsMesosResourceManager,
+extends the Streams ResourceManagerAdapter class and listens for allocation and release requests from the StreamsResourceServer (launched by the streams-on-mesos script).
+Simultaneously, the StreamsMesosScheduler class is running in a thread and listening for resource offers and
+other messages from Mesos.
+
+Between these to classes sits the shared state of the StreamsMesosState and the collection of StreamsMesosResource objects.
+
+The StreamsMesosResourceManager creates new StreamsMesosResource objects in the state and then waits for a period of time checking to see if the requests are RUNNNING before reporting back to Streams the request is ALLOCATED or PENDING.
+
+The StreamsMesosScheduler receives offers and if there are outstanding requests available, it determines if one of the offers is large enough for the request, and if so, launches the task (starts the streams controller in a task) using the built-in Mesos CommandExecutor.
+
+## Mesos Executor - CommandExecutor
+The initial design and implementation uses the built-in CommandExecutor of Mesos for running the getStartControllerCommand(... fork=false...) returned command.  By setting fork=false Mesos
+keeps the parent process opened and shown as RUNNING in the Mesos web GUI.
+
+When a resource is released, the ResourcemanagerUtilities.stopController() command is executed and the shutdown of the controller is completed and Mesos marks the task as FINISHED.
+
+# A few commands:
+
 ## mkdomain command
 streamtool mkdomain --property domain.externalResourceManager=mesos
 
@@ -9,47 +48,6 @@ streamtool mkdomain --property domain.externalResourceManager=mesos
 
 ## Get status of Mesos Resource Manager
 ./streams-on-mesos status -d StreamsDomain
-
-## To Do (Working notes to get version 1.0.0 ready)
-* Refactor to pull containers of SMR's into a StreamsMesosState class
-	* StreamsMesosResourceManager
-	* StreamsMesosResource
-	* StreamsMesosScheduler
-	* StreamsMesosState
-* Double check synchronized blocks
-* Track allocated and pending resources and messaging
-* Handle releaseResource() call for all and for specific descriptors
-* Traverse ResourceDescriptor
-	* Map how fields are used and named
-	* Be able to get this from a StreamsMesosResource object
-* Initial version of --deploy (done)
-  * Will come back to this after getting stuff to work
-* Validate Stop
-  * Prevent shutdown (unless --force) if we have resources being used
-
-
-## Development Questions:
-* What to do if more newRequests than offers can handle?
-* sampleRM had a lot of logic about re-using resources that are already beeing used but were not excluded by the new allocateResources request.  Should we implement that?  When would you do that?  Would we do that in the case that we configured the resource manager to take entire offers?
-* How does Descriptor ResourceKind {CONTAINER, UNKNOWN, PHYSICAL_HOST,...} field impact how it is used?
-
-## Future:
-* Handle multiple multiple clients (e.g. multiple domains)
-* Ability to run Mesos Resource Manager as root or a user
-  * root would allow easier authentication with pam (security.runAsRoot)
-  * user would limit to single user if pam authentication used
-* Instructions and test for PKI authentication
-* Resource packing when offers have more resources that needed (see Building applications on mesos book)
-* If cpu and mem set to -1, then use entire offer for a resource...done
-* Marathon submission of framework
-  * run streams-on-mesos from marathon
-* Streams Resource Manager custom commands to get internal state of allResources list, etc.
-* Web interface to get internal state
-* Persistent State manager - see Symphony Resource Manager
-* High Availability
-* Convert exceptions to ResourceManagerMessageException, did not see the API for that
-* Enhance logging (see Symphony resource manager)
-
 
 
 ## Dependencies
@@ -69,6 +67,7 @@ Use Maven to compile the source code for the application in the InfoSphere Strea
 
 
 ## Testing on Linux Workstation
+I have not tested these instructions yet
 
 1. Build and Install Mesos (I used 1.0.1)
 
@@ -141,61 +140,4 @@ If you ever need to stop an inactive framework in mesos:
 	garland/mesosphere-docker-mesos-master
 
 
-## FROM YARN...
-## Running the application
-
-1. Ensure that InfoSphere Streams is installed and running.
-2. Install and configure Apache Hadoop YARN.
-    * To install YARN, install Apache Hadoop Version 2.7.0.
-    * Update the following environment variables for your system:
-    ```
-    HADOOP_COMMON_HOME
-    HADOOP_COMMON_LIB_NATIVE_DIR
-    HADOOP_CONF_DIR
-    HADOOP_HDFS_HOME
-    HADOOP_HOME
-    HADOOP_PREFIX
-    HADOOP_YARN_HOME
-    JAVA_HOME
-    YARN_HOME
-    ```
-    For installation and configuration instructions, see the documentation on the Apache Hadoop website.
-3. Configure YARN for InfoSphere Streams.
-    * Enter `cd $YARN_HOME/etc/hadoop`.
-    * Set the following properties in the yarn-site.xml file:
-        * `yarn.nodemanager.vmem-check-enabled property`: The preferred setting for this property is false. This setting prevents YARN from stopping applications if the virtual memory for an application exceeds the threshold set for the application.
-        * `yarn.application.classpath property`: This property must be set to the appropriate value for the operating system as defined in the yarn-default.xml file.
-4. Ensure that the YARN cluster is up and running. For information about cluster setup and operation, see the documentation on the Apache Hadoop website.
-5. Create an InfoSphere Streams enterprise domain and specify YARN as the external resource manager for the domain.
-    * If you create the domain by using the Domain Manager, enter yarn in the External resource manager field.
-    * If you create the domain by using the streamtool mkdomain command, specify `--property domain.externalResourceManager=yarn` on the command.
-6. Review the following properties in the InfoSphere Streams YARN application master properties file and update as needed. This file is in the $STREAMS_INSTALL/etc/yarn directory.
-    * YARN application master properties
-    ```
-    AM_QUEUE_NAME=default # Queue name for the application master.
-    AM_CORES=2            #	Cores that are allocated to the application master.
-    AM_MEMORY=2048        # Memory that is allocated to the application master.
-    DC_CORES=2            #	Default number of cores to be requested for the domain controller service.
-    DC_MEMORY=8192        # Default memory in bytes to be requested for the domain controller service.
-    WAIT_SYNC_SECS=30     # Maximum wait time in seconds for resources to be allocated on a SYNCHRONOUS call.
-    WAIT_ASYNC_SECS=5     # Maximum wait time in seconds for resources to be allocated on an ASYNCHRONOUS call.
-    WAIT_FLEXIBLE_SECS=5  # Maximum wait time in seconds for resources to be allocated on a FLEXIBLE call.
-    WAIT_HEARTBEAT_SECS=5 # Maximum wait time in seconds between heartbeats sent to Apache Hadoop YARN.
-    ```
-
-7. Start the YARN application master by entering the following command:
-    `$STREAMS_INSTALL/bin/streams-on-yarn start --zkconnect host:port -d domain-id --deploy`
-
-    Notes:
-    * The `--zkconnect` option specifies the name of one or more host and port pairs for the configured external ZooKeeper ensemble. This value is the external ZooKeeper connection string. If the STREAMS_ZKCONNECT environment variable is set to this value, you do not need to specify the `--zkconnect` option on the command. To obtain this value, enter the `streamtool getzk -d domain-id` command.
-    * The `-d` option specifies the domain identifier. If the STREAMS_DOMAIN_ID environment variable is set to this value, you do not need to specify the `-d` option on the command.
-    * The `--deploy` option enables you to take advantage of the InfoSphere Streams provisioning features. When you specify this option, YARN copies and extracts the installer for each container. To avoid timeout issues, ensure that the value of the InfoSphere Streams `domain.serviceStartTimeout` property is at least 300 before you start the domain.
-    To view domain properties, use the streamtool getdomainproperties command. To update properties, use the streamtool setdomainproperties command. For more information about domain properties, use the streamtool man domainproperties command.
-8. Start the InfoSphere Streams domain by using the Domain Manager or the streamtool startdomain command.
-9. To stop the YARN application master, enter the following command:
-
-    `$STREAMS_INSTALL/bin/streams-on-yarn stop --zkconnect host:port -d domain-id `
-
-    Notes:
-    * The `--zkconnect` option specifies the name of one or more host and port pairs for the configured external ZooKeeper ensemble. This value is the external ZooKeeper connection string. If the STREAMS_ZKCONNECT environment variable is set to this value, you do not need to specify the --zkconnect option on the command. To obtain this value, enter the streamtool getzk -d domain-id command.
-    * The `-d` option specifies the domain identifier. If the STREAMS_DOMAIN_ID environment variable is set to this value, you do not need to specify the -d option on the command.
+## MORE TO COME ...

@@ -30,7 +30,7 @@ class StreamsMesosResource {
 	private static final Logger LOG = LoggerFactory.getLogger(StreamsMesosResource.class);
 
 	public static enum StreamsMesosResourceState {
-		NEW, LAUNCHED, RUNNING, STOPPING, STOPPED, RELEASED, FAILED;
+		NEW, LAUNCHED, RUNNING, STOPPING, STOPPED, FAILED;
 		@Override
 		public String toString() {
 			switch (this) {
@@ -44,8 +44,6 @@ class StreamsMesosResource {
 				return "STOPPING";
 			case STOPPED:
 				return "STOPPED";
-			case RELEASED:
-				return "RELEASED";
 			case FAILED:
 				return "FAILED";
 			default:
@@ -193,6 +191,10 @@ class StreamsMesosResource {
 	public boolean isRunning() {
 		// Fix for mesos
 		return _resourceState == StreamsMesosResourceState.RUNNING;
+	}
+	
+	public boolean isAllocated() {
+		return _taskId != null;
 	}
 
 	public void cancel() {
@@ -390,6 +392,14 @@ class StreamsMesosResource {
 	public void stop(StreamsMesosScheduler scheduler) {
 		LOG.info("*** Stopping Resource: " + _id);
 		
+		switch(_resourceState) {
+		case NEW:
+		case STOPPING:
+		case STOPPED:
+			return; // nothing to do
+		default:
+			break;
+		}
 		setState(StreamsMesosResourceState.STOPPING);
 		try {
 			ResourceDescriptor rd = getDescriptor();

@@ -103,10 +103,12 @@ public class StreamsMesosState {
 		LOG.debug("updateResourceByTaskId.allResources: " + _allResources.toString());
 		boolean foundMatch = false;
 		for (StreamsMesosResource smr : _allResources.values()) {
-			if (smr.getTaskId().equals(taskId)) {
-				foundMatch = true;
-				updateResource(smr.getId(),newState);
-			} 
+			if (smr.isAllocated()) {
+				if (smr.getTaskId().equals(taskId)) {
+					foundMatch = true;
+					updateResource(smr.getId(),newState);
+				} 
+			}
 		}
 		if (!foundMatch) {
 			LOG.warn("Update of Resource by TaskId Failed because SMR Not found (TaskID: " + taskId + ", newstate: " + newState.toString() + ")");
