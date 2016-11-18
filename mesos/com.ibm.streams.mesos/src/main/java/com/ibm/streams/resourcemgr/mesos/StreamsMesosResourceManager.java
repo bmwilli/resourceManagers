@@ -225,6 +225,32 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 		super.close();
 	}
 	
+	
+    /* (non-Javadoc)
+     * @see com.ibm.streams.resourcemgr.ResourceManagerAdapter#clientConnected(com.ibm.streams.resourcemgr.ClientInfo)
+     */
+	public void clientConnected(ClientInfo clientInfo) {
+		LOG.info("Client connected: " + clientInfo);
+		if (clientInfo.getClientName().equals("controller")) {
+			ClientInfo saved = _state.getClientInfo(clientInfo.getClientId());
+			if (saved != null) {
+				String version = clientInfo.getInstallVersion();
+				String savedVersion = saved.getInstallVersion();
+
+				// install version has changed
+				if (version != null && savedVersion != null && !version.equals(savedVersion)) {
+					LOG.info("##### client=" + saved.getClientId() + " changed install version from=" + savedVersion
+							+ " to=" + version);
+				}
+			}
+			// update client in state
+			_state.setClientInfo(clientInfo);
+
+		}
+	}
+	
+	
+	
     @Override
     public void validateTags(ClientInfo client, ResourceTags tags, Locale locale) throws ResourceTagException,
             ResourceManagerException {
@@ -350,14 +376,50 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 		LOG.info("################ release all client resources end ################");
 	}
 
+
 	
 
-	/////////////////////////////////////////////
-	/// MESOS FRAMEWORK INTEGRATION
-	/////////////////////////////////////////////
+	/* (non-Javadoc)
+	 * @see com.ibm.streams.resourcemgr.ResourceManagerAdapter#error(java.lang.String)
+	 */
+	@Override
+	public void error(String message) {
+		//super.error(message);
+		LOG.error("Error received from StreamsResourceServer: " + message);
+	}
+
+	/* (non-Javadoc)
+	 * @see com.ibm.streams.resourcemgr.ResourceManagerAdapter#error(java.lang.Throwable)
+	 */
+	@Override
+	public void error(Throwable throwable) {
+		// TODO Auto-generated method stub
+		//super.error(throwable);
+		LOG.error("Error received from StreamsResourceServer: " + throwable.getMessage());
+		throwable.printStackTrace();
+
+	}
+
+	/* (non-Javadoc)
+	 * @see com.ibm.streams.resourcemgr.ResourceManagerAdapter#trace(java.lang.String)
+	 */
+	@Override
+	public void trace(String message) {
+		// TODO Auto-generated method stub
+		//super.trace(message);
+		LOG.info("Streams: " + message);
+
+	}
+
+	
+/////////////////////////////////////////////
+/// MESOS FRAMEWORK INTEGRATION
+/////////////////////////////////////////////
 
 
-
+	
+	
+	
 	private static FrameworkInfo getFrameworkInfo() {
 		FrameworkInfo.Builder builder = FrameworkInfo.newBuilder();
 		builder.setFailoverTimeout(120000);

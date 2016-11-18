@@ -16,6 +16,8 @@
 
 package com.ibm.streams.resourcemgr.mesos;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -26,6 +28,7 @@ import org.apache.mesos.Protos.TaskStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.ibm.streams.resourcemgr.ClientInfo;
 import com.ibm.streams.resourcemgr.ResourceManagerException;
 import com.ibm.streams.resourcemgr.ResourceTags;
 
@@ -59,6 +62,9 @@ public class StreamsMesosState {
 	// pendingRequests: Tracks requests that have been reported back to Streams as PENDING
 	private List<StreamsMesosResource> _pendingRequests;
 
+	// Streams Client Information
+	// NOTE: We only handle a single Controller client at this time
+	private ClientInfo _clientInfo;
 	
 	/**
 	 * Constructor
@@ -68,6 +74,7 @@ public class StreamsMesosState {
 		_allResources = new ConcurrentHashMap<String, StreamsMesosResource>();
 		_newRequests = new CopyOnWriteArrayList<StreamsMesosResource>();
 		_pendingRequests = new CopyOnWriteArrayList<StreamsMesosResource>();
+		_clientInfo = null;
 
 	}
 	
@@ -216,46 +223,101 @@ public class StreamsMesosState {
 			return;
 		}
 	}
-	/*
-	// Update SMR and maintain lists
-	// Eventually pass what to update it with
-	synchronized public void updateResourceByTaskId(String taskId, StreamsMesosResource.ResourceState newState, StreamsMesosResource.TaskCompletionStatus newTaskCompletionStatus) {
-		LOG.info("updateResourceByTaskId(" + taskId + ", " + newState.toString() + ", " + newTaskCompletionStatus + ")");
-		LOG.debug("updateResourceByTaskId.allResources: " + _allResources.toString());
-		boolean foundMatch = false;
-		for (StreamsMesosResource smr : _allResources.values()) {
-			if (smr.isAllocated()) {
-				if (smr.getTaskId().equals(taskId)) {
-					foundMatch = true;
-					updateResource(smr.getId(),newState,newTaskCompletionStatus);
-				} 
-			}
-		}
-		if (!foundMatch) {
-			LOG.warn("Update of Resource by TaskId Failed because SMR Not found (TaskID: " + taskId + ")");
-		}
-	}
 	
-	// Update the SMR status 
-	// Need to handle these appropriately because we have concurrency issues of iterating in the scheduler
-	// and calling this to update the list
-	synchronized public void updateResource(String id, StreamsMesosResource.ResourceState newState, StreamsMesosResource.TaskCompletionStatus newTaskCompletionStatus) {
-		LOG.info("updateResource(" + id + ", " + newState.toString() + ", " + newTaskCompletionStatus + ")");
-		LOG.debug("updateResource.allResources: " + _allResources.toString());
-		StreamsMesosResource smr = null;
-		//StreamsMesosResource.StreamsMesosResourceState oldState;
-		// Find it in the list of all StreamsMesosResources
-		if (_allResources.containsKey(id)) {
-			smr = _allResources.get(id);
-			//oldState = smr.getState();
-			
-			// Update state
-			smr.setResourceState(newState);
-			smr.setTaskCompletionStatus(newTaskCompletionStatus);
-		} else {
-			LOG.warn("Update of Resource Failed because SMR Not found ((id: " + id  + ")");
-		}
+	
+	
+	
+	
+    /**
+     * Returns list of all known client identifiers
+     * 
+     * @return Collection<String>
+     */
+    public Collection<String> getClientIds() {
+        //return getChildren(getClientsPath());
+    	List<String> clientIds = new ArrayList<String>();
+    	clientIds.add(_clientInfo.getClientId());
+    	
+    	return clientIds;
+    }
 
-	}
-*/	
+    /**
+     * Returns client information
+     * 
+     * @param clientId - String
+     * @return ClientInfo
+     */
+    public ClientInfo getClientInfo(String clientId) {
+        ClientInfo client = null;
+        /*
+        try {
+            // ../clients/<clientId>
+            String clientJson = getPathProperty(getClientPath(clientId), "client");
+            if (clientJson != null) {
+                JSONObject json = JSONObject.parse(clientJson);
+                client = new ClientInformation(json);
+            }
+        } catch (Throwable t) {
+            Trace.logError(_manager.fgError(t.getMessage(), t), t);
+        }
+        */
+        
+        // Just ensure we are on the same page with the clientId requested
+        if (_clientInfo != null) {
+        	if (_clientInfo.getClientId().equals(clientId)) {
+        		client = _clientInfo;
+        	} else {
+        		LOG.error("getClientInfo from state failed because clientId(" + clientId + ") does not match the client id we are working with (" + _clientInfo.getClientId() + ").");
+        	}
+        }
+
+        return client;
+    }
+    
+
+    /**
+     * Set client information to persistence
+     * 
+     * @param client - ClientInfo
+     */
+    public void setClientInfo(ClientInfo client) {
+    	if (client != null) {
+	        if (_clientInfo == null) {
+	        	_clientInfo = client;
+	        } else if (!(_clientInfo.getClientId().equals(client.getClientId()))) {
+	        	LOG.error("setClientInfo on state failed because clientId(" + client.getClientId() + ") does not match the client id already set (" + _clientInfo.getClientId() + ").");
+	        } else {
+	        	// Setting to the same value so no need to do anything
+	        }
+    	} else {
+    		LOG.warn("setClientInfo on state failed because it was passed null client object");
+    	}
+	    
+
+    	
+    	/*
+        try {
+            String clientId = client.getClientId();
+
+            // ../clients/<clientId>
+            String clientPath = getClientPath(clientId);
+            if (_persistence.exists(clientPath)) {
+                JSONObject json = ((ClientInformation)client).toJson();
+                Properties props = new Properties();
+                props.setProperty("client", json.serialize());
+                setPath(clientPath, props);
+                
+                // update requests with new client
+                for (SymphonyRequest request : _requests.values()) {
+                    request.setClient(client);
+                }
+            }
+        } catch (Throwable t) {
+            Trace.logError(_manager.fgError(t.getMessage(), t), t);
+        }
+        */
+    }
+	
+	
+	
 }

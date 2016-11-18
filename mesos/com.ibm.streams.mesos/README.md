@@ -139,5 +139,13 @@ If you ever need to stop an inactive framework in mesos:
 	-d \
 	garland/mesosphere-docker-mesos-master
 
+## Limitations
+### Streams Resource Manager Related
+* Only handles a single Controller Client (single domain)
+* ...
+
+### Mesos Related
+* Only supports command_executor, no docker_executor support yet
+* ...
 
 ## MORE TO COME ...
