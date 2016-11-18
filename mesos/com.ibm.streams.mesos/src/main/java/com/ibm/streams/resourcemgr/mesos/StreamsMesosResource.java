@@ -45,7 +45,8 @@ import org.slf4j.LoggerFactory;
 class StreamsMesosResource {
 	private static final Logger LOG = LoggerFactory.getLogger(StreamsMesosResource.class);
 
-	public static enum StreamsMesosResourceState {
+	// Represents interpretation of Mesos Task
+	public static enum ResourceState {
 		NEW, LAUNCHED, RUNNING, STOPPING, STOPPED, FAILED;
 		@Override
 		public String toString() {
@@ -67,17 +68,65 @@ class StreamsMesosResource {
 			}
 		}
 	}
+	
+	// Represents standing with IBM Streams for this request
+	public static enum RequestState {
+		NEW, ALLOCATED, PENDING, CANCELLED;
+		@Override
+		public String toString() {
+			switch(this) {
+			case NEW:
+				return "NEW";
+			case PENDING:
+				return "PENDING";
+			case ALLOCATED:
+				return "ALLOCATED";
+			case CANCELLED:
+				return "CANCELLED";
+			default:
+				throw new IllegalArgumentException();
+			}
+		}
+	}
+	
+	// Represents completion status for the task
+	public static enum TaskCompletionStatus {
+		NONE, FINISHED, FAILED, ERROR, KILLED, LOST;
+		@Override
+		public String toString() {
+			switch(this) {
+			case NONE:
+				return "NONE";
+			case FINISHED:
+				return "FINISHED";
+			case FAILED:
+				return "FAILED";
+			case ERROR:
+				return "ERROR";
+			case KILLED:
+				return "KILLED";
+			case LOST:
+				return "LOST";
+			default:
+				throw new IllegalArgumentException();
+			}
+		}
+	}
 
 	// Unique Identier used for identification within Framework and for Mesos
 	// Task ID
-	private String _id;
+	private String _resourceId;
 	// Streams related members
 	private String _domainId = null;
 	private String _zkConnect = null;
 	// Need to understand more about how this is used within containers
 	// Was getting error about key not found, os went with Yarn RM approach to test
 	private String _homeDir = null;
-	private StreamsMesosResourceState _resourceState = StreamsMesosResourceState.NEW;
+
+	private ResourceState _resourceState = ResourceState.NEW;
+	private RequestState _requestState = RequestState.NEW;
+	private TaskCompletionStatus _taskCompletionStatus = TaskCompletionStatus.NONE;
+	
 	private Set<String> _tags = new HashSet<String>();
 
 	private boolean _deployStreams;
@@ -89,7 +138,6 @@ class StreamsMesosResource {
 	private double _cpu = -1;
 
 	private boolean _isMaster = false;
-	private boolean _cancelled = false;
 
 	// Mesos Task related members
 	private String _taskId = null;
@@ -100,7 +148,7 @@ class StreamsMesosResource {
 	//public StreamsMesosResource(String id, String domainId, String zk, int priority, Map<String, String> argsMap,
 	public StreamsMesosResource(String id, String domainId, String zk, Map<String, String> argsMap,
 			List<Protos.CommandInfo.URI> uriList) {
-		this._id = id;
+		this._resourceId = id;
 		this._domainId = domainId;
 		this._zkConnect = zk;
 		//this.priority = priority;
@@ -111,7 +159,7 @@ class StreamsMesosResource {
 	}
 
 	public String getId() {
-		return _id;
+		return _resourceId;
 	}
 
 	public String getDomainId() {
@@ -169,18 +217,35 @@ class StreamsMesosResource {
 	/**
 	 * @return the state
 	 */
-	public StreamsMesosResourceState getState() {
+	public ResourceState getResourceState() {
 		return _resourceState;
 	}
 
 	/**
 	 * @param state the state to set
 	 */
-	public void setState(StreamsMesosResourceState state) {
+	public void setResourceState(ResourceState state) {
 		this._resourceState = state;
 	}
 	
 	
+	
+
+	public RequestState getRequestState() {
+		return _requestState;
+	}
+
+	public void setRequestState(RequestState _requestState) {
+		this._requestState = _requestState;
+	}
+
+	public TaskCompletionStatus getTaskCompletionStatus() {
+		return _taskCompletionStatus;
+	}
+
+	public void setTaskCompletionStatus(TaskCompletionStatus _taskCompletionStatus) {
+		this._taskCompletionStatus = _taskCompletionStatus;
+	}
 
 	/**
 	 * @return the taskId
@@ -206,23 +271,23 @@ class StreamsMesosResource {
 
 	public boolean isRunning() {
 		// Fix for mesos
-		return _resourceState == StreamsMesosResourceState.RUNNING;
+		return _resourceState == ResourceState.RUNNING;
 	}
 	
 	public boolean isAllocated() {
 		return _taskId != null;
 	}
 
-	public void cancel() {
-		_cancelled = true;
+	//public void cancel() {
+	//	_cancelled = true;
 		// Fix for mesos
 		// if(allocatedContainer!=null)
 		// allocatedContainer.cancel();
-	}
+	//}
 
-	public boolean isCancelled() {
-		return _cancelled;
-	}
+	//public boolean isCancelled() {
+	//	return _cancelled;
+	//}
 
 	/*
 	 * fix for mesos public void setAllocatedContainer(ContainerWrapper cw) {
@@ -240,7 +305,7 @@ class StreamsMesosResource {
 	public ResourceDescriptor getDescriptor() {
 		// if(allocatedContainer != null)
 		// return allocatedContainer.getDescriptor();
-		return StreamsMesosResourceManager.getDescriptor(_id, getHostName());
+		return StreamsMesosResourceManager.getDescriptor(_resourceId, getHostName());
 	}
 
 	public ResourceDescriptorState getDescriptorState() {
@@ -406,7 +471,7 @@ class StreamsMesosResource {
 	}
 	
 	public void stop(StreamsMesosScheduler scheduler) {
-		LOG.info("*** Stopping Resource: " + _id);
+		LOG.info("*** Stopping Resource: " + _resourceId);
 		
 		switch(_resourceState) {
 		case NEW:
@@ -416,7 +481,7 @@ class StreamsMesosResource {
 		default:
 			break;
 		}
-		setState(StreamsMesosResourceState.STOPPING);
+		setResourceState(ResourceState.STOPPING);
 		try {
 			ResourceDescriptor rd = getDescriptor();
 			LOG.info("Stopping Domain Controller: " + rd);
@@ -440,10 +505,18 @@ class StreamsMesosResource {
 
 	@Override
 	public String toString() {
-		return "StreamsMesosResource [id=" + _id + ", state=" + _resourceState + ", domainId=" + _domainId + ", zkConnect="
-				+ _zkConnect + ", memory=" + _memory + ", cpu=" + _cpu + ", isMaster="
-				+ _isMaster + ", cancelled=" + _cancelled + ", tags=" + _tags
-				+ ", taskId=" + _taskId + ", hostName=" + _hostName
-				+ "]";
+		return "StreamsMesosResource [resourceId=" + _resourceId + 
+				", resourceState=" + _resourceState + 
+				", requestState=" + _requestState +
+				", domainId=" + _domainId + 
+				", zkConnect=" + _zkConnect + 
+				", memory=" + _memory + 
+				", cpu=" + _cpu + 
+				", isMaster=" + _isMaster + 
+				", tags=" + _tags + 
+				", taskId=" + _taskId + 
+				", hostName=" + _hostName +
+				", taskCompletionStatus=" + _taskCompletionStatus +
+				"]";
 	}
 }

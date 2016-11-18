@@ -208,7 +208,8 @@ public class StreamsMesosScheduler implements Scheduler {
 					satisfiedRequests.add(smr);
 					// Tell resource manager we have satisfied the request and
 					// status
-					_state.updateResource(smr.getId(), StreamsMesosResource.StreamsMesosResourceState.LAUNCHED);	
+					_state.taskLaunched(smr.getId());
+					//_state.updateResource(smr.getId(), StreamsMesosResource.ResourceState.LAUNCHED, StreamsMesosResource.TaskCompletionStatus.NONE);	
 
 				} else {
 					LOG.info("Offer did not meet requirements, maybe the next offer will.");
@@ -265,37 +266,61 @@ public class StreamsMesosScheduler implements Scheduler {
 	public void statusUpdate(SchedulerDriver schedulerDriver, TaskStatus taskStatus) {
 		
 		LOG.info("Mesos Task Status update: " + taskStatus.getState() + " from " + taskStatus.getTaskId().getValue());
+		
+		_state.taskStatusUpdate(taskStatus);
 
+		/*
 		// Convert Mesos taskStatus to our own StreamsMesosResourceState
-		StreamsMesosResource.StreamsMesosResourceState newState = null;
+		StreamsMesosResource.ResourceState newResourceState = null;
+		StreamsMesosResource.TaskCompletionStatus newTaskCompletionStatus = null;
+		
 		
 		switch (taskStatus.getState()) {
 		case TASK_STAGING:
 		case TASK_STARTING:
-			newState = StreamsMesosResource.StreamsMesosResourceState.LAUNCHED;
+			newResourceState = StreamsMesosResource.ResourceState.LAUNCHED;
+			newTaskCompletionStatus = StreamsMesosResource.TaskCompletionStatus.NONE;
 			break;
 		case TASK_RUNNING:
-			newState = StreamsMesosResource.StreamsMesosResourceState.RUNNING;
+			newResourceState = StreamsMesosResource.ResourceState.RUNNING;
+			newTaskCompletionStatus = StreamsMesosResource.TaskCompletionStatus.NONE;
 			break;
 		case TASK_FINISHED:
-		case TASK_KILLED:
-			newState = StreamsMesosResource.StreamsMesosResourceState.STOPPED;
+			newResourceState = StreamsMesosResource.ResourceState.STOPPED;
+			newTaskCompletionStatus = StreamsMesosResource.TaskCompletionStatus.FINISHED;
 			break;
 		case TASK_ERROR:
-			newState = StreamsMesosResource.StreamsMesosResourceState.FAILED;
+			newResourceState = StreamsMesosResource.ResourceState.FAILED;
+			newTaskCompletionStatus = StreamsMesosResource.TaskCompletionStatus.ERROR;
+			break;	
+		case TASK_KILLED:
+			newResourceState = StreamsMesosResource.ResourceState.FAILED;
+			newTaskCompletionStatus = StreamsMesosResource.TaskCompletionStatus.KILLED;
+
+			break;
+		case TASK_LOST:
+			newResourceState = StreamsMesosResource.ResourceState.FAILED;
+			newTaskCompletionStatus = StreamsMesosResource.TaskCompletionStatus.LOST;
+
+			break;
+		case TASK_FAILED:
+			newResourceState = StreamsMesosResource.ResourceState.FAILED;
+			newTaskCompletionStatus = StreamsMesosResource.TaskCompletionStatus.FAILED;
 			break;
 		default:
-			newState = null;
+			newResourceState = null;
+			newTaskCompletionStatus = null;
 			break;
 		}
 		
-		// Notify the StreamsMesosResourceFramework that a task status has
-		// changed
-		if (newState != null) {
-			LOG.info("Mesos Task Status Update mapped to Resource State: " + newState.toString() );
-			_state.updateResourceByTaskId(taskStatus.getTaskId().getValue(), newState);
+		
+		if (newResourceState != null) {
+			LOG.info("Mesos Task Status Update Mapped: Resource State = " + newResourceState.toString() +
+					", Task Completion Status = " + newTaskCompletionStatus.toString());
+			_state.updateResourceByTaskId(taskStatus.getTaskId().getValue(), newResourceState, newTaskCompletionStatus);
 		} else
 			LOG.info("Mesos Task Status Update was not mapped to a Resource State, no action");
+		*/
 	}
 
 }

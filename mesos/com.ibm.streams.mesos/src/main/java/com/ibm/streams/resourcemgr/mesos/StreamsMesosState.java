@@ -22,6 +22,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.apache.mesos.Protos;
+import org.apache.mesos.Protos.TaskStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -116,30 +117,130 @@ public class StreamsMesosState {
 		return _newRequests;
 	}
 	
+	public StreamsMesosResource getResource(String resourceId) {
+		if (_allResources.containsKey(resourceId)) {
+			return _allResources.get(resourceId);
+		} else {
+			LOG.warn("getResource from state failed: Resource Not found (id: " + resourceId  + ")");
+			return null;
+		}
+	}
+	
+	public StreamsMesosResource getResourceByTaskId(String taskId) {
+		for (StreamsMesosResource smr : _allResources.values()) {
+			if (smr.isAllocated()) {
+				if (smr.getTaskId().equals(taskId)) {
+					return smr;
+				} 
+			}
+		}
+		// Not found
+		LOG.warn("getREsourceByTaskId from state failed: Resource Not found.  May not be Launched yet. (TaskID: " + taskId + ")");
+		return null;
+	}
+	
+	
+	public void taskLaunched(String resourceId) {
+		StreamsMesosResource smr = getResource(resourceId);
+		if (smr != null) {
+			smr.setResourceState(StreamsMesosResource.ResourceState.LAUNCHED);
+			smr.setTaskCompletionStatus(StreamsMesosResource.TaskCompletionStatus.NONE);
+		} else {
+			LOG.warn("taskLaunched from state failed to find resource (id: " + resourceId + ")");
+		}
+
+	}
+	
+	// Handle the Status updates from Mesos
+	public void taskStatusUpdate(TaskStatus taskStatus) {
+		LOG.info("_state.taskStatusUpdate()");
+		String taskId = taskStatus.getTaskId().getValue();
+		
+		StreamsMesosResource smr = getResourceByTaskId(taskId);
+
+		if (smr != null) {
+			
+			// Handle the mapping and interpretation of mesos status update
+			
+			StreamsMesosResource.ResourceState newResourceState = null;
+			StreamsMesosResource.TaskCompletionStatus newTaskCompletionStatus = null;
+			
+			
+			switch (taskStatus.getState()) {
+			case TASK_STAGING:
+			case TASK_STARTING:
+				newResourceState = StreamsMesosResource.ResourceState.LAUNCHED;
+				newTaskCompletionStatus = StreamsMesosResource.TaskCompletionStatus.NONE;
+				break;
+			case TASK_RUNNING:
+				newResourceState = StreamsMesosResource.ResourceState.RUNNING;
+				newTaskCompletionStatus = StreamsMesosResource.TaskCompletionStatus.NONE;
+				break;
+			case TASK_FINISHED:
+				newResourceState = StreamsMesosResource.ResourceState.STOPPED;
+				newTaskCompletionStatus = StreamsMesosResource.TaskCompletionStatus.FINISHED;
+				break;
+			case TASK_ERROR:
+				newResourceState = StreamsMesosResource.ResourceState.FAILED;
+				newTaskCompletionStatus = StreamsMesosResource.TaskCompletionStatus.ERROR;
+				break;	
+			case TASK_KILLED:
+				newResourceState = StreamsMesosResource.ResourceState.FAILED;
+				newTaskCompletionStatus = StreamsMesosResource.TaskCompletionStatus.KILLED;
+				break;
+			case TASK_LOST:
+				newResourceState = StreamsMesosResource.ResourceState.FAILED;
+				newTaskCompletionStatus = StreamsMesosResource.TaskCompletionStatus.LOST;
+				break;
+			case TASK_FAILED:
+				newResourceState = StreamsMesosResource.ResourceState.FAILED;
+				newTaskCompletionStatus = StreamsMesosResource.TaskCompletionStatus.FAILED;
+				break;
+			default:
+				newResourceState = null;
+				newTaskCompletionStatus = null;
+				break;
+			}
+			
+			
+			if (newResourceState != null) {
+				LOG.info("Mesos Task Status Update Mapped: Resource State = " + newResourceState.toString() +
+						", Task Completion Status = " + newTaskCompletionStatus.toString());
+				smr.setResourceState(newResourceState);
+				smr.setTaskCompletionStatus(newTaskCompletionStatus);
+			} else
+				LOG.info("Mesos Task Status Update was not mapped to a Resource State, no action");
+			
+		} else {
+			LOG.warn("taskStatusUpdate from state failed to find resource (TaskID: " + taskId + ")");
+			return;
+		}
+	}
+	/*
 	// Update SMR and maintain lists
 	// Eventually pass what to update it with
-	synchronized public void updateResourceByTaskId(String taskId, StreamsMesosResource.StreamsMesosResourceState newState) {
-		LOG.info("updateResourceByTaskId(" + taskId + ", " + newState.toString());
+	synchronized public void updateResourceByTaskId(String taskId, StreamsMesosResource.ResourceState newState, StreamsMesosResource.TaskCompletionStatus newTaskCompletionStatus) {
+		LOG.info("updateResourceByTaskId(" + taskId + ", " + newState.toString() + ", " + newTaskCompletionStatus + ")");
 		LOG.debug("updateResourceByTaskId.allResources: " + _allResources.toString());
 		boolean foundMatch = false;
 		for (StreamsMesosResource smr : _allResources.values()) {
 			if (smr.isAllocated()) {
 				if (smr.getTaskId().equals(taskId)) {
 					foundMatch = true;
-					updateResource(smr.getId(),newState);
+					updateResource(smr.getId(),newState,newTaskCompletionStatus);
 				} 
 			}
 		}
 		if (!foundMatch) {
-			LOG.warn("Update of Resource by TaskId Failed because SMR Not found (TaskID: " + taskId + ", newstate: " + newState.toString() + ")");
+			LOG.warn("Update of Resource by TaskId Failed because SMR Not found (TaskID: " + taskId + ")");
 		}
 	}
 	
 	// Update the SMR status 
 	// Need to handle these appropriately because we have concurrency issues of iterating in the scheduler
 	// and calling this to update the list
-	synchronized public void updateResource(String id, StreamsMesosResource.StreamsMesosResourceState newState) {
-		LOG.info("updateResource(" + id + ", " + newState.toString());
+	synchronized public void updateResource(String id, StreamsMesosResource.ResourceState newState, StreamsMesosResource.TaskCompletionStatus newTaskCompletionStatus) {
+		LOG.info("updateResource(" + id + ", " + newState.toString() + ", " + newTaskCompletionStatus + ")");
 		LOG.debug("updateResource.allResources: " + _allResources.toString());
 		StreamsMesosResource smr = null;
 		//StreamsMesosResource.StreamsMesosResourceState oldState;
@@ -149,11 +250,12 @@ public class StreamsMesosState {
 			//oldState = smr.getState();
 			
 			// Update state
-			smr.setState(newState);
+			smr.setResourceState(newState);
+			smr.setTaskCompletionStatus(newTaskCompletionStatus);
 		} else {
-			LOG.warn("Update of Resource Failed because SMR Not found ((id: " + id + ", newstate: " + newState.toString() + ")");
+			LOG.warn("Update of Resource Failed because SMR Not found ((id: " + id  + ")");
 		}
 
 	}
-	
+*/	
 }

@@ -500,7 +500,7 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 			synchronized (this) {
 				LOG.trace("Polling the new requests...");
 				for (StreamsMesosResource smr : newAllocationRequests) {
-					LOG.trace("smr {id: " + smr.getId() + ", state: " + smr.getState().toString() + "}");
+					LOG.trace("smr {id: " + smr.getId() + ", state: " + smr.getResourceState().toString() + "}");
 					if (smr.isRunning()) {
 						LOG.info("Resource is now running: " + smr);
 						allocCount++;
