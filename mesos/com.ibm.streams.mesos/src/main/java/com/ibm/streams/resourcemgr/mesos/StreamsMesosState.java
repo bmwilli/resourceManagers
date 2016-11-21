@@ -29,8 +29,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.ibm.streams.resourcemgr.ClientInfo;
+import com.ibm.streams.resourcemgr.ResourceDescriptor;
 import com.ibm.streams.resourcemgr.ResourceManagerException;
 import com.ibm.streams.resourcemgr.ResourceTags;
+import com.ibm.streams.resourcemgr.mesos.StreamsMesosResource.RequestState;
+import com.ibm.streams.resourcemgr.mesos.StreamsMesosResource.ResourceState;
 
 /**
  * Contains the state of the Resource manager
@@ -81,9 +84,9 @@ public class StreamsMesosState {
 	
 	
 	// Create a new SMR and put it proper containers
-	synchronized public StreamsMesosResource createNewResource(String domainId, String zk, ResourceTags tags, boolean isMaster, List<Protos.CommandInfo.URI> uriList) throws ResourceManagerException {
+	synchronized public StreamsMesosResource createNewResource(ClientInfo client, ResourceTags tags, boolean isMaster, List<Protos.CommandInfo.URI> uriList) throws ResourceManagerException {
 		// Create the Resource object (default state is NEW)
-		StreamsMesosResource smr = new StreamsMesosResource(Utils.generateNextId("smr"), domainId, zk, _manager.getArgsMap(),
+		StreamsMesosResource smr = new StreamsMesosResource(Utils.generateNextId("smr"), client, _manager, _manager.getArgsMap(),
 				uriList);
 
 		smr.setMaster(isMaster);
@@ -109,7 +112,9 @@ public class StreamsMesosState {
 		
 		// Add to collections to track
 		LOG.info("Queuing new Resource Request: " + smr.toString());
+		// These might be the same thing...need to determine this.
 		_newRequests.add(smr);
+		//_pendingRequests.add(smr);
 		_allResources.put(smr.getId(), smr);
 
 		return smr;
@@ -122,6 +127,17 @@ public class StreamsMesosState {
 	// Return list of new Reqeusts as an immutable list
 	public List<StreamsMesosResource> getNewRequestList() {
 		return _newRequests;
+	}
+	
+	// Return resourceId
+	// placeholder for when we implement persistence storage in paths
+	public String getResourceId(String nativeResourceId) {
+		return nativeResourceId;
+	}
+	
+	// Return resourceId associated with the resource descriptor from Streams
+	public String getResourceId(ResourceDescriptor descriptor) {
+		return getResourceId(descriptor.getNativeResourceId());
 	}
 	
 	public StreamsMesosResource getResource(String resourceId) {
@@ -142,7 +158,7 @@ public class StreamsMesosState {
 			}
 		}
 		// Not found
-		LOG.warn("getREsourceByTaskId from state failed: Resource Not found.  May not be Launched yet. (TaskID: " + taskId + ")");
+		LOG.warn("getResourceByTaskId from state failed: Resource Not found.  May not be Launched yet. (TaskID: " + taskId + ")");
 		return null;
 	}
 	
@@ -157,6 +173,19 @@ public class StreamsMesosState {
 		}
 
 	}
+	
+	public void setPending(String resourceId) {
+		StreamsMesosResource smr = getResource(resourceId);
+		if (smr != null) {
+			smr.setRequestState(StreamsMesosResource.RequestState.PENDING);
+			_pendingRequests.add(smr);
+		} else {
+			LOG.warn("setPending from state failed to find resource (id: " + resourceId + ")");
+		}
+	}
+	
+	
+	
 	
 	private void mapAndUpdateMesosTaskStateToResourceState(StreamsMesosResource smr, Protos.TaskState taskState) {
 		// Handle the mapping and interpretation of mesos status update
@@ -218,7 +247,7 @@ public class StreamsMesosState {
 		LOG.info("_state.taskStatusUpdate()");
 		
 		StreamsMesosResource.ResourceState oldResourceState, newResourceState;
-		StreamsMesosResource.RequestState oldRequestState;
+		StreamsMesosResource.RequestState requestState;
 		
 		String taskId = taskStatus.getTaskId().getValue();
 		
@@ -228,22 +257,36 @@ public class StreamsMesosState {
 			oldResourceState = smr.getResourceState();
 			mapAndUpdateMesosTaskStateToResourceState(smr, taskStatus.getState());
 			newResourceState = smr.getResourceState();
-			oldRequestState = smr.getRequestState();
+			requestState = smr.getRequestState();
 			
-			// What does the update mean for us with regards to:
-			// * PENDING vs ALLOCATED
-			// * Lists it is on
-			// * Notifications to be sent
-			// ****** WORK IS HERE!!!
-			//if (oldResourceState = )
-			
-			
-			
+			if (requestState == RequestState.NEW && newResourceState == ResourceState.RUNNING) {
+				//Allocated within time so no need to notify client
+				smr.setRequestState(RequestState.ALLOCATED);
+			} else if (requestState == RequestState.PENDING && newResourceState == ResourceState.RUNNING) {
+				// Need to notify client
+				smr.setRequestState(RequestState.ALLOCATED);
+				_pendingRequests.remove(smr);
+				smr.notifyClientAllocated();
+			}
 
 
 		} else {
 			LOG.warn("taskStatusUpdate from state failed to find resource (TaskID: " + taskId + ")");
 			return;
+		}
+	}
+	
+
+	// Handle cancelling a resource request
+	public void cancelPendingResource(ResourceDescriptor descriptor) {
+		StreamsMesosResource smr = getResource(getResourceId(descriptor));
+		if (smr != null) {
+			// So what state is it in?  What if we just allocated it?
+			// Update its request state
+			smr.setRequestState(RequestState.CANCELLED);
+			
+		} else {
+			LOG.warn("cancelPendingResource from state failed to find resource (id: " + getResourceId(descriptor) + ")");
 		}
 	}
 	

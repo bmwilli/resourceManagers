@@ -347,10 +347,11 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 		LOG.info("descriptors: " + descriptors);
 		LOG.info("locale: " + locale);
 		for (ResourceDescriptor rd : descriptors) {
-			if (!_state.getAllResources().containsKey(rd.getNativeResourceId()))
-				throw new ResourceManagerException("No such resource: " + rd.getNativeResourceId());
-			StreamsMesosResource smr = _state.getAllResources().get(rd.getNativeResourceId());
-			smr.stop(_scheduler);
+			//if (!_state.getAllResources().containsKey(rd.getNativeResourceId()))
+			//	throw new ResourceManagerException("No such resource: " + rd.getNativeResourceId());
+			//StreamsMesosResource smr = _state.getAllResources().get(rd.getNativeResourceId());
+			//smr.stop(_scheduler);
+			_state.releaseResource(rd);
 		}
 		
 		LOG.info("################ release specified resources end ################");
@@ -369,14 +370,41 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 		LOG.info("################ release all client resources start ################");
 		LOG.info("client: " + client);;
 		LOG.info("locale: " + locale);
-		for (StreamsMesosResource smr : _state.getAllResources().values()) {
-			smr.stop(_scheduler);
-		}
+		//for (StreamsMesosResource smr : _state.getAllResources().values()) {
+		//	smr.stop(_scheduler);
+		//}
+		_state.releaseAllResources(client);
 		
 		LOG.info("################ release all client resources end ################");
 	}
 
 
+	
+	
+	
+	
+	/**
+	 * Tells us Streams no longer needs the resource we reported as pending
+	 * 
+	 * (non-Javadoc)
+	 * @see com.ibm.streams.resourcemgr.ResourceManagerAdapter#cancelPendingResources(com.ibm.streams.resourcemgr.ClientInfo, java.util.Collection, java.util.Locale)
+	 */
+	@Override
+	public void cancelPendingResources(ClientInfo client, Collection<ResourceDescriptor> descriptors, Locale locale)
+			throws ResourceManagerException {
+		LOG.info("################ cancel Pending Resources start ################");
+		LOG.info("client: " + client);
+		LOG.info("descriptors: " + descriptors);
+		LOG.info("locale: " + locale);
+		for (ResourceDescriptor rd : descriptors) {
+			_state.cancelPendingResource(rd)
+		}
+		
+		LOG.info("################ cancel Pending Resources end ################");
+	}
+	
+	
+	
 	
 
 	/* (non-Javadoc)
@@ -525,11 +553,36 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 			ResourceTags tags, AllocateType rType) throws ResourceManagerException, ResourceTagException {
 
 		List<StreamsMesosResource> newRequestsFromStreams = new ArrayList<StreamsMesosResource>();
-
+		
+		String domainId = clientInfo.getDomainId();
+		String zkConnect = clientInfo.getZkConnect();
+		
+		// Transition to where we support multiple domains but for now we only support one
+		// Ensure that the domain for the client is what the argument specified
+		// Should never have a mismatch because ResourceServer would no allow domain to start
+		// if Resource manager was not registered to handle multiple domains
+		if (!domainId.equals(_argsMap.get(StreamsMesosConstants.DOMAIN_ID_ARG))) {
+			LOG.error("Domain ID of resource request (" + domainId + 
+					") does not match domainID registered for this resource manager (" + 
+					_argsMap.get(StreamsMesosConstants.DOMAIN_ID_ARG)	 + ")");
+			throw new ResourceManagerException("Domain ID of resource request (" + domainId + 
+					") does not match domainID registered for this resource manager (" + 
+					_argsMap.get(StreamsMesosConstants.DOMAIN_ID_ARG)	 + ")");
+		}
+		
+		// Same temporary check for zookeeper, again, should never happen
+		if (!zkConnect.equals(_argsMap.get(StreamsMesosConstants.ZK_ARG))) {
+			LOG.error("ZK_CONNECT of resource request (" + zkConnect + 
+					") does not match ZK_CONNECT registered for this resource manager (" + 
+					_argsMap.get(StreamsMesosConstants.ZK_ARG)	 + ")");
+			throw new ResourceManagerException("ZK_CONNECT of resource request (" + zkConnect + 
+					") does not match ZK_CONNECT registered for this resource manager (" + 
+					_argsMap.get(StreamsMesosConstants.ZK_ARG)	 + ")");
+		}
+		
 		for (int i = 0; i < count; i++) {
 			// Creates new Resource, queues, and adds to map of all resources
-			StreamsMesosResource smr = _state.createNewResource(_argsMap.get(StreamsMesosConstants.DOMAIN_ID_ARG),
-					_argsMap.get(StreamsMesosConstants.ZK_ARG), tags, isMaster, _uriList);
+			StreamsMesosResource smr = _state.createNewResource(clientInfo, tags, isMaster, _uriList);
 			// Put it in our local list to wait a little bit of time to see if it gets started
 			newRequestsFromStreams.add(smr);
 		}
@@ -542,6 +595,7 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 	 * Attempt to wait a little bit to see if we can get resources allocated
 	 * Note: If streams is being deployed to the containers, that can take a
 	 * while.
+	 * Notify pending if we wait and they are not allocated
 	 * 
 	 * @param newAllocationRequests
 	 * @param rType
@@ -585,9 +639,15 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 		// We have waited long enough
 		synchronized (this) {
 			List<ResourceDescriptorState> descriptorStates = new ArrayList<ResourceDescriptorState>();
+			// Loop through them and set PENDING state for those not allocated so we know to notify
+			// when they are allocated
 			for (StreamsMesosResource smr : newAllocationRequests) {
 				descriptorStates.add(smr.getDescriptorState());
-				//toNotifyList.add(smr.getDescriptor().getNativeResourceId());
+				
+				if (!smr.isAllocated()) {
+					LOG.info("Setting request status of request id " + smr.getId() + " to PENDING");
+					_state.setPending(smr.getId());
+				}
 			}
 			LOG.info("Returning descriptorStates: " + descriptorStates);
 			return descriptorStates;

@@ -18,9 +18,10 @@ streamtool addresourcespec --numresources 1[exclusive]
 streamtool addresourcespec --numresources 1,ingest
 streamtool addresourcespec --numresources 1,ingest[exclusive]
 
+??? What causes CancelPendingRequests to get called by Streams?
+	A1: Stopping the instance while there are pending requests
 
-
-## To Do (Working notes to get version 1.0.0 ready)
+## To Do (Working notes to get version 0.1.0 ready)
 * Track allocated and pending resources and messaging
 * Fix naming convention of StreamsMesosResource id, taskId
 	id - should be unique and references the request from streams
@@ -39,13 +40,20 @@ streamtool addresourcespec --numresources 1,ingest[exclusive]
 * Validate Stop
   * Prevent shutdown (unless --force) if we have resources being used
 
+## Development issues:
+* Do we need both _newRequests and _pendingRequests list?
+* Started using the YARN resource manager as a model where only handled specified domain and zookeeper
+* Moving toward Symphony approach to support multiple
+* Code in transition (example allocateResources, get domainID from clientInfo or argument?)
+	* For now do both and look for inconsistencies
+	* Future move to just cilentID and remove domainId as a required argument
 
 ## Development Questions:
 * What to do if more newRequests than offers can handle?
 * sampleRM had a lot of logic about re-using resources that are already beeing used but were not excluded by the new allocateResources request.  Should we implement that?  When would you do that?  Would we do that in the case that we configured the resource manager to take entire offers?
 * How does Descriptor ResourceKind {CONTAINER, UNKNOWN, PHYSICAL_HOST,...} field impact how it is used?
 
-## Future:
+## Future
 * Handle multiple multiple clients (e.g. multiple domains)
 * Ability to run Mesos Resource Manager as root or a user
   * root would allow easier authentication with pam (security.runAsRoot)
@@ -58,6 +66,7 @@ streamtool addresourcespec --numresources 1,ingest[exclusive]
 * Streams Resource Manager custom commands to get internal state of allResources list, etc.
 * Web interface to get internal state
 * Persistent State manager - see Symphony Resource Manager
+	* ValidateState
 * High Availability
 * Convert exceptions to ResourceManagerMessageException, did not see the API for that
 * Enhance logging (see Symphony resource manager)

@@ -23,6 +23,7 @@ package com.ibm.streams.resourcemgr.mesos;
 //import java.net.UnknownHostException;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Map;
 
@@ -32,6 +33,7 @@ import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.CommandInfo;
 import org.apache.mesos.Protos.Resource;
 
+import com.ibm.streams.resourcemgr.ClientInfo;
 import com.ibm.streams.resourcemgr.ResourceDescriptor;
 import com.ibm.streams.resourcemgr.ResourceDescriptorState;
 import com.ibm.streams.resourcemgr.ResourceManagerException;
@@ -71,7 +73,7 @@ class StreamsMesosResource {
 	
 	// Represents standing with IBM Streams for this request
 	public static enum RequestState {
-		NEW, ALLOCATED, PENDING, CANCELLED;
+		NEW, ALLOCATED, PENDING, CANCELLED, RELEASED;
 		@Override
 		public String toString() {
 			switch(this) {
@@ -83,6 +85,8 @@ class StreamsMesosResource {
 				return "ALLOCATED";
 			case CANCELLED:
 				return "CANCELLED";
+			case RELEASED:
+				return "RELEASED";
 			default:
 				throw new IllegalArgumentException();
 			}
@@ -116,6 +120,10 @@ class StreamsMesosResource {
 	// Unique Identier used for identification within Framework and for Mesos
 	// Task ID
 	private String _resourceId;
+	// Client Info that requested this resource
+	private ClientInfo _client;
+	// Resource manager
+	private StreamsMesosResourceManager _manager;
 	// Streams related members
 	private String _domainId = null;
 	private String _zkConnect = null;
@@ -145,12 +153,14 @@ class StreamsMesosResource {
 	
 	
 	
-	//public StreamsMesosResource(String id, String domainId, String zk, int priority, Map<String, String> argsMap,
-	public StreamsMesosResource(String id, String domainId, String zk, Map<String, String> argsMap,
+	//public StreamsMesosResource(String id, ClientInfo client, String domainId, String zk, int priority, Map<String, String> argsMap,
+	public StreamsMesosResource(String id, ClientInfo client, StreamsMesosResourceManager manager, Map<String, String> argsMap,
 			List<Protos.CommandInfo.URI> uriList) {
 		this._resourceId = id;
-		this._domainId = domainId;
-		this._zkConnect = zk;
+		this._client = client;
+		this._manager = manager;
+		this._domainId = client.getDomainId();
+		this._zkConnect = client.getZkConnect();
 		//this.priority = priority;
 		this._argsMap = argsMap;
 		this._uriList = uriList;
@@ -501,6 +511,14 @@ class StreamsMesosResource {
 		// It is there that we will be notified that the task has stopped and will update the
 		// _resourceState to STOPPED
 
+	}
+	
+	
+	public void notifyClientAllocated() {
+		Collection<ResourceDescriptor> descriptors = new ArrayList<ResourceDescriptor>();
+		descriptors.add(getDescriptor());
+		LOG.info("Sending resourcesAllocated notification for resource: " + getId());
+		_manager.getResourceNotificationManager().resourcesAllocated(_client.getClientId(), descriptors);
 	}
 
 	@Override
