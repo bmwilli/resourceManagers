@@ -49,7 +49,7 @@ class StreamsMesosResource {
 
 	// Represents interpretation of Mesos Task
 	public static enum ResourceState {
-		NEW, LAUNCHED, RUNNING, STOPPING, STOPPED, FAILED;
+		NEW, LAUNCHED, RUNNING, STOPPING, STOPPED, FAILED, CANCELLED;
 		@Override
 		public String toString() {
 			switch (this) {
@@ -65,6 +65,8 @@ class StreamsMesosResource {
 				return "STOPPED";
 			case FAILED:
 				return "FAILED";
+			case CANCELLED:
+				return "CANCELLED";
 			default:
 				throw new IllegalArgumentException();
 			}
@@ -480,13 +482,15 @@ class StreamsMesosResource {
 		return Protos.Value.Scalar.newBuilder().setValue(value);
 	}
 	
-	public void stop(StreamsMesosScheduler scheduler) {
+	public void stop() {
 		LOG.info("*** Stopping Resource: " + _resourceId);
 		
 		switch(_resourceState) {
 		case NEW:
 		case STOPPING:
 		case STOPPED:
+		case FAILED:
+		case CANCELLED:
 			return; // nothing to do
 		default:
 			break;
@@ -519,6 +523,13 @@ class StreamsMesosResource {
 		descriptors.add(getDescriptor());
 		LOG.info("Sending resourcesAllocated notification for resource: " + getId());
 		_manager.getResourceNotificationManager().resourcesAllocated(_client.getClientId(), descriptors);
+	}
+	
+	public void notifyClientRevoked() {
+		Collection<ResourceDescriptor> descriptors = new ArrayList<ResourceDescriptor>();
+		descriptors.add(getDescriptor());
+		LOG.info("Sending resourcesRevoked notification for resource: " + getId());
+		_manager.getResourceNotificationManager().resourcesRevoked(_client.getClientId(), descriptors);
 	}
 
 	@Override

@@ -47,6 +47,7 @@ public class StreamsMesosState {
 	private static final Logger LOG = LoggerFactory.getLogger(StreamsMesosState.class);
 	
 	private StreamsMesosResourceManager _manager;
+	//private StreamsMesosScheduler _scheduler;
 
 	/* StreamsMesosResource containers */
 
@@ -56,14 +57,11 @@ public class StreamsMesosState {
 	// Using concurrentHashMap.  simplifies concurrency between the threads of the this class and the mesos scheduler
 	private Map<String, StreamsMesosResource> _allResources;
 	
-	// newRequests: Tracks new requests from Streams and checked by scheduler
+	// requestedResources: Tracks new requests from Streams and checked by scheduler
 	// when new offers arrive
 	// Using concurrent CopyOnWriteArrayList.  It is slower than ArrayList but at the rate that 
 	// we add/remove resources and requests it is more than fast enough and simplifies concurrency
-	private List<StreamsMesosResource> _newRequests;
-	
-	// pendingRequests: Tracks requests that have been reported back to Streams as PENDING
-	private List<StreamsMesosResource> _pendingRequests;
+	private List<StreamsMesosResource> _requestedResources;
 
 	// Streams Client Information
 	// NOTE: We only handle a single Controller client at this time
@@ -74,15 +72,18 @@ public class StreamsMesosState {
 	 */
 	public StreamsMesosState(StreamsMesosResourceManager manager) {
 		_manager = manager;
+		//_scheduler = null;
 		_allResources = new ConcurrentHashMap<String, StreamsMesosResource>();
-		_newRequests = new CopyOnWriteArrayList<StreamsMesosResource>();
-		_pendingRequests = new CopyOnWriteArrayList<StreamsMesosResource>();
+		_requestedResources = new CopyOnWriteArrayList<StreamsMesosResource>();
 		_clientInfo = null;
 
 	}
+
 	
-	
-	
+	//public void setScheduler(StreamsMesosScheduler _scheduler) {
+	//	this._scheduler = _scheduler;
+	//}
+
 	// Create a new SMR and put it proper containers
 	synchronized public StreamsMesosResource createNewResource(ClientInfo client, ResourceTags tags, boolean isMaster, List<Protos.CommandInfo.URI> uriList) throws ResourceManagerException {
 		// Create the Resource object (default state is NEW)
@@ -113,9 +114,8 @@ public class StreamsMesosState {
 		// Add to collections to track
 		LOG.info("Queuing new Resource Request: " + smr.toString());
 		// These might be the same thing...need to determine this.
-		_newRequests.add(smr);
-		//_pendingRequests.add(smr);
 		_allResources.put(smr.getId(), smr);
+		_requestedResources.add(smr);
 
 		return smr;
 	}
@@ -125,8 +125,18 @@ public class StreamsMesosState {
 	}
 	
 	// Return list of new Reqeusts as an immutable list
-	public List<StreamsMesosResource> getNewRequestList() {
-		return _newRequests;
+	public List<StreamsMesosResource> getRequestedResources() {
+		return _requestedResources;
+	}
+	
+	// Remove a resource from the list of requested resources if it is there
+	public void removeRequestedResource(StreamsMesosResource smr) {
+		_requestedResources.remove(smr);
+	}
+	
+	// Remove a collection of requested resources
+	public void removeRequestedResources(Collection<StreamsMesosResource> resources) {
+		_requestedResources.removeAll(resources);
 	}
 	
 	// Return resourceId
@@ -178,7 +188,6 @@ public class StreamsMesosState {
 		StreamsMesosResource smr = getResource(resourceId);
 		if (smr != null) {
 			smr.setRequestState(StreamsMesosResource.RequestState.PENDING);
-			_pendingRequests.add(smr);
 		} else {
 			LOG.warn("setPending from state failed to find resource (id: " + resourceId + ")");
 		}
@@ -244,7 +253,7 @@ public class StreamsMesosState {
 	
 	// Handle the Status updates from Mesos
 	public void taskStatusUpdate(TaskStatus taskStatus) {
-		LOG.info("_state.taskStatusUpdate()");
+		LOG.info("!!!!!!!!!!!! MESOS TASK STATUS UPDATE start !!!!!!!!!!!!!!!");
 		
 		StreamsMesosResource.ResourceState oldResourceState, newResourceState;
 		StreamsMesosResource.RequestState requestState;
@@ -255,42 +264,103 @@ public class StreamsMesosState {
 
 		if (smr != null) {
 			oldResourceState = smr.getResourceState();
+			LOG.trace("oldResourceState: " + oldResourceState.toString());
 			mapAndUpdateMesosTaskStateToResourceState(smr, taskStatus.getState());
 			newResourceState = smr.getResourceState();
+			LOG.trace("newResourceState: " + newResourceState.toString());
 			requestState = smr.getRequestState();
 			
-			if (requestState == RequestState.NEW && newResourceState == ResourceState.RUNNING) {
-				//Allocated within time so no need to notify client
-				smr.setRequestState(RequestState.ALLOCATED);
-			} else if (requestState == RequestState.PENDING && newResourceState == ResourceState.RUNNING) {
-				// Need to notify client
-				smr.setRequestState(RequestState.ALLOCATED);
-				_pendingRequests.remove(smr);
-				smr.notifyClientAllocated();
+			
+			boolean changed = (oldResourceState != newResourceState) ? true:false;
+			
+			if (changed) {
+				LOG.info("Resource state of " + smr.getId() + " changed from " + oldResourceState + " to " + newResourceState);
+			
+			
+				// LAUNCHED ?? Anything to do?
+				
+				// RUNNING
+				if (newResourceState == ResourceState.RUNNING && requestState == RequestState.NEW) {
+					LOG.info("Resource " + smr.getId() + " is now RUNNING and RequestState was NEW, changing RequestState to ALLOCATED");
+					//Allocated within time so no need to notify client
+					smr.setRequestState(RequestState.ALLOCATED);
+				} else if (newResourceState == ResourceState.RUNNING && requestState == RequestState.PENDING) {
+					LOG.info("Resource " + smr.getId() + " is now RUNNING and RequestState was PENDING, changing RequestState to ALLOCATED and notifying Streams");
+					// Need to notify client
+					smr.setRequestState(RequestState.ALLOCATED);
+					smr.notifyClientAllocated();
+					
+				// STOPPED and FAILED - may need to better test to determine normal expected from unexpected
+					
+				// STOPPED - normal
+				} else if (newResourceState == ResourceState.STOPPED) {
+					LOG.info("Resource " + smr.getId() + " is now STOPPED, changing RequestState to RELEASED.");
+					smr.setRequestState(RequestState.RELEASED);
+	
+				// FAILED - abnormal
+				// This may be where we need to notify streams something bad happened
+				} else if (newResourceState == ResourceState.FAILED) {
+					LOG.info("Resource " + smr.getId() + " is now FAILED, changing RequestState to RELEASED, Notifying Streams of revoke");
+					smr.setRequestState(RequestState.RELEASED);
+					smr.notifyClientRevoked();
+				}
 			}
-
 
 		} else {
 			LOG.warn("taskStatusUpdate from state failed to find resource (TaskID: " + taskId + ")");
 			return;
 		}
+		LOG.info("!!!!!!!!!!!! MESOS TASK STATUS UPDATE stop !!!!!!!!!!!!!!!");
+
 	}
 	
-
+// *** WE ARE HERE ***//
 	// Handle cancelling a resource request
-	public void cancelPendingResource(ResourceDescriptor descriptor) {
+	public void cancelPendingResource(ResourceDescriptor descriptor) throws ResourceManagerException {
 		StreamsMesosResource smr = getResource(getResourceId(descriptor));
 		if (smr != null) {
 			// So what state is it in?  What if we just allocated it?
 			// Update its request state
 			smr.setRequestState(RequestState.CANCELLED);
-			
+			if (smr.isRunning()) {
+				// Its running so no need to remove from list of requsted resources, but need to stop it
+				LOG.info("Pending Resource (" + getResourceId(descriptor) + ") cancelled by streams, but it is already running, stopping...");
+				smr.stop();
+			} else {
+				// Remove from the requested resource list if it is on it
+				removeRequestedResource(smr);
+				// If it was new, set it to CANCELLED so we no it was never started
+				if (smr.getResourceState() == ResourceState.NEW) {
+					smr.setResourceState(ResourceState.CANCELLED);
+				}
+			}
 		} else {
-			LOG.warn("cancelPendingResource from state failed to find resource (id: " + getResourceId(descriptor) + ")");
+			throw new ResourceManagerException("CancelPendingResource failed to find resource (id: " + getResourceId(descriptor) + ")");
 		}
 	}
 	
 	
+	// Release a single resource
+	public void releaseResource(ResourceDescriptor descriptor) throws ResourceManagerException {
+		StreamsMesosResource smr = getResource(getResourceId(descriptor));
+		if (smr == null)
+			throw new ResourceManagerException("Cannot release resource. No such resource: " + descriptor.getNativeResourceId());
+		smr.stop();
+	}
+	
+	
+	// Release all resources for a given client
+	public void releaseAllResources(ClientInfo client) throws ResourceManagerException {
+		// Verify we are workign with this client
+		ClientInfo clientInfo = getClientInfo(client.getClientId());
+		if (clientInfo == null)
+			throw new ResourceManagerException("Cannot release all resource. Client unknown: " + client.getClientId());
+		
+		// Fix for multiple clients in the future
+		for (StreamsMesosResource smr : getAllResources().values()) {
+			smr.stop();
+		}
+	}
 	
 	
 	

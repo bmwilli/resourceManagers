@@ -55,10 +55,10 @@ public class StreamsMesosScheduler implements Scheduler {
 	/**
 	 * @param streamsRM
 	 */
-	public StreamsMesosScheduler(StreamsMesosResourceManager manager) {
+	public StreamsMesosScheduler(StreamsMesosResourceManager manager, StreamsMesosState state) {
 		super();
 		_manager = manager;
-		_state = _manager.getState();
+		_state = state;
 	}
 
 	/*
@@ -159,6 +159,8 @@ public class StreamsMesosScheduler implements Scheduler {
 	@Override
 	public void resourceOffers(SchedulerDriver schedulerDriver, List<Offer> offers) {
 		LOG.trace("Resource Offers Made...");
+		//LOG.trace("***** OFFERS *****");
+		//LOG.trace(offers.toString());
 
 		// Loop through offers, and exhaust the offer with resources we can
 		// satisfy
@@ -179,7 +181,7 @@ public class StreamsMesosScheduler implements Scheduler {
 			LOG.trace("OFFER: {cpu: " + offerCpus + ", mem: " + offerMem + ", id:" + offer.getId() + "}");
 
 			// Get the list of new requests from the Framework
-			List<StreamsMesosResource> newRequestList = _state.getNewRequestList();
+			List<StreamsMesosResource> newRequestList = _state.getRequestedResources();
 			// Create List of Requests that we satisfied
 			List<StreamsMesosResource> satisfiedRequests = new ArrayList<StreamsMesosResource>();
 			
@@ -217,7 +219,8 @@ public class StreamsMesosScheduler implements Scheduler {
 			} // end for each newRequest
 				
 			// Outside of iterator, remove the satisifed requests from the list of new ones
-			newRequestList.removeAll(satisfiedRequests);
+			_state.removeRequestedResources(satisfiedRequests);
+			//newRequestList.removeAll(satisfiedRequests);
 			satisfiedRequests.clear();
 			
 			// If offer was not used at all, decline it
@@ -269,58 +272,6 @@ public class StreamsMesosScheduler implements Scheduler {
 		
 		_state.taskStatusUpdate(taskStatus);
 
-		/*
-		// Convert Mesos taskStatus to our own StreamsMesosResourceState
-		StreamsMesosResource.ResourceState newResourceState = null;
-		StreamsMesosResource.TaskCompletionStatus newTaskCompletionStatus = null;
-		
-		
-		switch (taskStatus.getState()) {
-		case TASK_STAGING:
-		case TASK_STARTING:
-			newResourceState = StreamsMesosResource.ResourceState.LAUNCHED;
-			newTaskCompletionStatus = StreamsMesosResource.TaskCompletionStatus.NONE;
-			break;
-		case TASK_RUNNING:
-			newResourceState = StreamsMesosResource.ResourceState.RUNNING;
-			newTaskCompletionStatus = StreamsMesosResource.TaskCompletionStatus.NONE;
-			break;
-		case TASK_FINISHED:
-			newResourceState = StreamsMesosResource.ResourceState.STOPPED;
-			newTaskCompletionStatus = StreamsMesosResource.TaskCompletionStatus.FINISHED;
-			break;
-		case TASK_ERROR:
-			newResourceState = StreamsMesosResource.ResourceState.FAILED;
-			newTaskCompletionStatus = StreamsMesosResource.TaskCompletionStatus.ERROR;
-			break;	
-		case TASK_KILLED:
-			newResourceState = StreamsMesosResource.ResourceState.FAILED;
-			newTaskCompletionStatus = StreamsMesosResource.TaskCompletionStatus.KILLED;
-
-			break;
-		case TASK_LOST:
-			newResourceState = StreamsMesosResource.ResourceState.FAILED;
-			newTaskCompletionStatus = StreamsMesosResource.TaskCompletionStatus.LOST;
-
-			break;
-		case TASK_FAILED:
-			newResourceState = StreamsMesosResource.ResourceState.FAILED;
-			newTaskCompletionStatus = StreamsMesosResource.TaskCompletionStatus.FAILED;
-			break;
-		default:
-			newResourceState = null;
-			newTaskCompletionStatus = null;
-			break;
-		}
-		
-		
-		if (newResourceState != null) {
-			LOG.info("Mesos Task Status Update Mapped: Resource State = " + newResourceState.toString() +
-					", Task Completion Status = " + newTaskCompletionStatus.toString());
-			_state.updateResourceByTaskId(taskStatus.getTaskId().getValue(), newResourceState, newTaskCompletionStatus);
-		} else
-			LOG.info("Mesos Task Status Update was not mapped to a Resource State, no action");
-		*/
 	}
 
 }

@@ -178,9 +178,10 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 	@Override
 	public void initialize() throws ResourceManagerException {
 		LOG.debug("Initialize();");
-
-		_state = new StreamsMesosState(this);
 		
+		_state = new StreamsMesosState(this);
+
+
 		// Provision Streams if necessary
 		// Caution, this can take some time and cause timeouts on slow machines
 		// or workstations that are overloaded
@@ -204,7 +205,7 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 		// Setup and register the Mesos Scheduler
 		LOG.info("About to call runMesosScheduler...");
 
-		runMesosScheduler(master);
+		runMesosScheduler(master, _state);
 
 		LOG.info("StreamsMesosResourceFramework.initialize() complete");
 
@@ -378,10 +379,6 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 		LOG.info("################ release all client resources end ################");
 	}
 
-
-	
-	
-	
 	
 	/**
 	 * Tells us Streams no longer needs the resource we reported as pending
@@ -397,7 +394,7 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 		LOG.info("descriptors: " + descriptors);
 		LOG.info("locale: " + locale);
 		for (ResourceDescriptor rd : descriptors) {
-			_state.cancelPendingResource(rd)
+			_state.cancelPendingResource(rd);
 		}
 		
 		LOG.info("################ cancel Pending Resources end ################");
@@ -456,14 +453,14 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 		return builder.build();
 	}
 
-	private void runMesosScheduler(String mesosMaster) {
+	private void runMesosScheduler(String mesosMaster, StreamsMesosState state) {
 		// private void runMesosScheduler(List<CommandInfo.URI>uriList, String
 		// mesosMaster) {
 		LOG.info("Creating new Mesos Scheduler...");
 		// LOG.info("URI List: " + uriList.toString());
 		// LOG.info("commandInfo: " + getCommandInfo(uriList));;
 
-		_scheduler = new StreamsMesosScheduler(this);
+		_scheduler = new StreamsMesosScheduler(this, state);
 
 		LOG.info("Creating new MesosSchedulerDriver...");
 		_driver = new MesosSchedulerDriver(_scheduler, getFrameworkInfo(), mesosMaster);
@@ -625,7 +622,7 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 				LOG.trace("Allocated Count: " + allocCount);
 				if (allocCount == newAllocationRequests.size()) {		
 					// We have them all, no need to continue to wait
-					LOG.info("Allocated Count = # new allocation requests (" + newAllocationRequests.size() + "), stop waiting and polling");
+					LOG.info("Allocated Count (" + allocCount + ") equals new allocation requests (" + newAllocationRequests.size() + "), stop waiting and polling");
 					break;
 				}
 			}
