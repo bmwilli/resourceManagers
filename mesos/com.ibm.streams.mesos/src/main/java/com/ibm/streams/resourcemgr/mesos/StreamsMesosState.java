@@ -87,7 +87,7 @@ public class StreamsMesosState {
 	// Create a new SMR and put it proper containers
 	synchronized public StreamsMesosResource createNewResource(ClientInfo client, ResourceTags tags, boolean isMaster, List<Protos.CommandInfo.URI> uriList) throws ResourceManagerException {
 		// Create the Resource object (default state is NEW)
-		StreamsMesosResource smr = new StreamsMesosResource(Utils.generateNextId("smr"), client, _manager, _manager.getArgsMap(),
+		StreamsMesosResource smr = new StreamsMesosResource(Utils.generateNextId("resource"), client, _manager, _manager.getArgsMap(),
 				uriList);
 
 		smr.setMaster(isMaster);

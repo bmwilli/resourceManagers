@@ -22,26 +22,17 @@ streamtool addresourcespec --numresources 1,ingest[exclusive]
 	A1: Stopping the instance while there are pending requests
 
 ## To Do (Working notes to get version 0.1.0 ready)
-* Track allocated and pending resources and messaging
-* Fix naming convention of StreamsMesosResource id, taskId
-	id - should be unique and references the request from streams
-		current: smr_1
-	taskId - is filled in when the task is launched
-		current: mesos_smr_1
-	
-* Double check synchronized blocks
 
-* Handle releaseResource() call for all and for specific descriptors
-* Traverse ResourceDescriptor
-	* Map how fields are used and named
-	* Be able to get this from a StreamsMesosResource object
+* Where is proper place to create descriptor?
+  - Move it to the State
+* Revisit arguments and properties
+  - mesos master a property
 * Initial version of --deploy (done)
   * Will come back to this after getting stuff to work
 * Validate Stop
   * Prevent shutdown (unless --force) if we have resources being used
 
 ## Development issues:
-* Do we need both _newRequests and _pendingRequests list?
 * Started using the YARN resource manager as a model where only handled specified domain and zookeeper
 * Moving toward Symphony approach to support multiple
 * Code in transition (example allocateResources, get domainID from clientInfo or argument?)
@@ -49,9 +40,7 @@ streamtool addresourcespec --numresources 1,ingest[exclusive]
 	* Future move to just cilentID and remove domainId as a required argument
 
 ## Development Questions:
-* What to do if more newRequests than offers can handle?
 * sampleRM had a lot of logic about re-using resources that are already beeing used but were not excluded by the new allocateResources request.  Should we implement that?  When would you do that?  Would we do that in the case that we configured the resource manager to take entire offers?
-* How does Descriptor ResourceKind {CONTAINER, UNKNOWN, PHYSICAL_HOST,...} field impact how it is used?
 
 ## Future
 * Handle multiple multiple clients (e.g. multiple domains)

@@ -6,24 +6,29 @@ They are scenarios that need to be met in development to provide a 1.0 version o
 Many of them would have multiple sub test cases with very different configurations and parameters
 
 1) Create / Start Domain, Create / Start Instance
-	Yes - with pre-deployed streams, default resource sizes (properties file)
+	with pre-deployed streams, default resource sizes (properties file)
+	TEST PASSED
 	
 2) Add a resource specification to the instance.  Kind is set to FLEXIBLE
 	2a) When there is resources available
-		Yes
+		TEST PASSED
 	2b) When there is not resources available, but then become available
 		This will test PENDING and notifications
+		TEST PASSED
 
 3) Attempt to add resource to instance when resource manager does not have any more resources 
 	(ensure graceful handling)
+	TEST PASSED
 
 4) Remove resource from instance (I assume you meant removing a resource specification;
 	which I don't think takes effect until the instance stops)
 	Yes - but ass mentioned does not take affect until restarted (use Quiesce)
+	TEST PASSED
 
 5) Quiesce a resource in a resource specification; 
 	should be released back to the resource manager; and a replacement requested	
 	Yes * Odd message that it failed, but it actually worked..need to investigate
+	TEST PENDING SEE MESSAGE
 	
 6) If you can kill controller and restart.sh on a resource to simulate a resource 
 	going away unexpectedly; we should eventually detect when ephemeral node timeout 
@@ -51,9 +56,10 @@ This is a working list and as features are developed and tested, they will be re
 - resource tags (memory and cpu)
 
 Scenarios
----------
+=========
 	
 Scenario 1:
+-----------
 
 streamtool mkdomain --property domain.externalResourceManager=mesos
 streamtool startdomain
@@ -84,6 +90,16 @@ Resource    Status  Schedulable Services                  Tags            Resour
 mesos_smr_1 RUNNING yes         RUNNING:app,sam,srm,view  management,view 1[1(none)[shared]]
 mesos_smr_3 RUNNING yes         RUNNING:app               application     2[1(none)[shared]]
 
-	
+
+Scenario 2: (over request resources) and cancel
+-----------------------------------------------
+
+streamtool startdomain
+streamtool startinstance
+streamtool addresoucespec --numresources 4
+streamtool stopinstance
+
+Should result in the pending resources being cancelled and no need to accept offers, instance resources stopped and released
+
 	
 -- Thanks Steve Halverson
