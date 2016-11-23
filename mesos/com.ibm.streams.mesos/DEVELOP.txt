@@ -22,11 +22,11 @@ streamtool addresourcespec --numresources 1,ingest[exclusive]
 	A1: Stopping the instance while there are pending requests
 
 ## To Do (Working notes to get version 0.1.0 ready)
-
+* Handle error condition when framework killed but zookeeper thinks domain is running
+  * streamtool stopdomain --force will try and release resource...handle gracefully
 * Where is proper place to create descriptor?
   - Move it to the State
 * Revisit arguments and properties
-  - mesos master a property
 * Initial version of --deploy (done)
   * Will come back to this after getting stuff to work
 * Validate Stop
@@ -43,6 +43,7 @@ streamtool addresourcespec --numresources 1,ingest[exclusive]
 * sampleRM had a lot of logic about re-using resources that are already beeing used but were not excluded by the new allocateResources request.  Should we implement that?  When would you do that?  Would we do that in the case that we configured the resource manager to take entire offers?
 
 ## Future
+* Supress offers from mesos until there is a resource request
 * Handle multiple multiple clients (e.g. multiple domains)
 * Ability to run Mesos Resource Manager as root or a user
   * root would allow easier authentication with pam (security.runAsRoot)

@@ -70,6 +70,7 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 	private Properties _props = null;
 	private StreamsMesosScheduler _scheduler;
 	private MesosSchedulerDriver _driver;
+	private String _master;
 	private List<Protos.CommandInfo.URI> _uriList = new ArrayList<Protos.CommandInfo.URI>();
 	private boolean _deployStreams = false;
 
@@ -181,34 +182,34 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 		
 		_state = new StreamsMesosState(this);
 
-
-		// Provision Streams if necessary
-		// Caution, this can take some time and cause timeouts on slow machines
-		// or workstations that are overloaded
-		// In testing, saw issues where Streams Resource Manager Server would
-		// disconnect client.
-		if (_argsMap.containsKey(StreamsMesosConstants.DEPLOY_ARG)) {
-			try {
+		try {
+			// Provision Streams if necessary
+			// Caution, this can take some time and cause timeouts on slow machines
+			// or workstations that are overloaded
+			// In testing, saw issues where Streams Resource Manager Server would
+			// disconnect client.
+			if (_argsMap.containsKey(StreamsMesosConstants.DEPLOY_ARG)) {
 				LOG.info("Deploy flag set.  Calling provisionStreams...");
-				provisionStreams(_argsMap, _uriList, StreamsMesosConstants.PROVISIONING_SHARED_URI);
-			} catch (StreamsMesosException e) {
-				LOG.info("Caught error from provisionStreams");
-				throw new ResourceManagerException("Initialization of Streams Mesos Failed to provision Streams", e);
+				provisionStreams(_argsMap, _uriList, Utils.getProperty(getProps(), StreamsMesosConstants.PROPS_MESOS_FETCH_PARENT_URI, StreamsMesosConstants.MESOS_FETCH_PARENT_URI_DEFAULT));
 			}
+	
+			// Get the streams master 
+			// Priority: Argument, Property, Default
+			_master = Utils.getProperty(getProps(), StreamsMesosConstants.PROPS_MESOS_MASTER, StreamsMesosConstants.MESOS_MASTER_DEFAULT);
+			if (_argsMap.containsKey(StreamsMesosConstants.MESOS_MASTER_ARG))
+				_master = _argsMap.get(StreamsMesosConstants.MESOS_MASTER_ARG);
+			LOG.info("Mesos master set to: " + _master);
+	
+			// Setup and register the Mesos Scheduler
+			LOG.info("About to call runMesosScheduler...");
+	
+			runMesosScheduler(_master, _state);
+	
+			LOG.info("StreamsMesosResourceFramework.initialize() complete");
+		} catch (StreamsMesosException e) {
+			LOG.error("Error caught initializing StreamsResourceManager: " + e.toString());
+			throw new ResourceManagerException(e.toString(), e);
 		}
-
-		// Temporary, not sure why constant would ever have the master
-		String master = StreamsMesosConstants.MESOS_MASTER;
-		if (_argsMap.containsKey(StreamsMesosConstants.MESOS_MASTER_ARG))
-			master = _argsMap.get(StreamsMesosConstants.MESOS_MASTER_ARG);
-
-		// Setup and register the Mesos Scheduler
-		LOG.info("About to call runMesosScheduler...");
-
-		runMesosScheduler(master, _state);
-
-		LOG.info("StreamsMesosResourceFramework.initialize() complete");
-
 	}
 
 	/*
@@ -220,10 +221,11 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 	@Override
 	public void close() {
 		LOG.info("StreamsResourceServer called close()");
-		LOG.info("stopping the mesos driver...");
-		Protos.Status driverStatus = _driver.stop();
-		LOG.info("...driver stopped, status: " + driverStatus.toString());
-		super.close();
+		if (_driver != null) {
+			LOG.info("stopping the mesos driver...");
+			Protos.Status driverStatus = _driver.stop();
+			LOG.info("...driver stopped, status: " + driverStatus.toString());
+		}
 	}
 	
 	
@@ -418,11 +420,11 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 	 */
 	@Override
 	public void error(Throwable throwable) {
-		// TODO Auto-generated method stub
 		//super.error(throwable);
-		LOG.error("Error received from StreamsResourceServer: " + throwable.getMessage());
-		throwable.printStackTrace();
-
+		if (throwable != null) {
+			LOG.error("Error received from StreamsResourceServer: " + throwable.getMessage());
+			throwable.printStackTrace();
+		}
 	}
 
 	/* (non-Javadoc)
@@ -430,7 +432,6 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 	 */
 	@Override
 	public void trace(String message) {
-		// TODO Auto-generated method stub
 		//super.trace(message);
 		LOG.info("Streams: " + message);
 
@@ -445,15 +446,15 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 	
 	
 	
-	private static FrameworkInfo getFrameworkInfo() {
+	private FrameworkInfo getFrameworkInfo() {
 		FrameworkInfo.Builder builder = FrameworkInfo.newBuilder();
 		builder.setFailoverTimeout(120000);
-		builder.setUser("");
-		builder.setName(StreamsMesosConstants.FRAMEWORK_NAME);
+		builder.setUser(Utils.getProperty(getProps(), StreamsMesosConstants.PROPS_MESOS_USER, StreamsMesosConstants.MESOS_USER_DEFAULT));
+		builder.setName(Utils.getProperty(getProps(), StreamsMesosConstants.PROPS_FRAMEWORK_NAME, StreamsMesosConstants.FRAMEWORK_NAME_DEFAULT));
 		return builder.build();
 	}
 
-	private void runMesosScheduler(String mesosMaster, StreamsMesosState state) {
+	private void runMesosScheduler(String mesosMaster, StreamsMesosState state) throws StreamsMesosException {
 		// private void runMesosScheduler(List<CommandInfo.URI>uriList, String
 		// mesosMaster) {
 		LOG.info("Creating new Mesos Scheduler...");
@@ -468,6 +469,9 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 		LOG.info("About to start the mesos scheduler driver...");
 		Protos.Status driverStatus = _driver.start();
 		LOG.info("...start returned status: " + driverStatus.toString());
+		if (driverStatus != Protos.Status.DRIVER_RUNNING) {
+			throw new StreamsMesosException(_scheduler.getLastErrorMessage());
+		}
 	}
 
 

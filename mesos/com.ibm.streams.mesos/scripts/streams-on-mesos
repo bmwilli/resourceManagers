@@ -30,7 +30,7 @@ class Command(object):
 COMMANDS = {
 	"start": Command("start", "Starts the Streams Mesos Framework (Scheduler). If the --deploy option is specified,\n\tStreams will first be installed on the node before starting the services.",
 			 "\t[--zkconnect {<host>:<port>},...]\n"
-			 + "\t[--master <Mesos Master URI>]\n"
+			 + "\t[--master <Mesos Master URI>] //Can be specified in properties file\n"
 			 + "\t[-d,--domain-id <did>]\n"
 			 + "\t[--deploy]\n"
 			 + "\t[--properties <optional: path to Streams Mesos Scheduler Properties>]"
@@ -187,7 +187,7 @@ if(sys.argv[1] == "start"):
 		command = command+ " --zkconnect " + zk
 	if not wasPropSet:
 		command = command+ " --properties " + properties
-	if not wasMasterSet:
+	if wasMasterSet:
 		command = command+ " --master " + master
 	if not wasTypeSet:
 		command = command + " --type " + type

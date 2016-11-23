@@ -29,13 +29,14 @@ public class StreamsMesosConstants {
 
 	/* Turn these into arguments */
 	public static final String
-		MESOS_MASTER = "zk://localhost:2181/mesos"
+		MESOS_MASTER_DEFAULT = "zk://localhost:2181/mesos"
 	;
 
 	/* Identification Constants */
 	public static final String
 		RESOURCE_TYPE = "mesos",
-		FRAMEWORK_NAME = "IBMStreamsRM"
+		FRAMEWORK_NAME_DEFAULT = "IBMStreamsRM",
+		MESOS_USER_DEFAULT = ""
 	;
 
 	/* Names of command line arguments */
@@ -64,8 +65,8 @@ public class StreamsMesosConstants {
 		PROVISIONING_WORKDIR_PREFIX = "/tmp/streams.mesos",
 		// Default location of location to stage resources for mesos to fetch
 		// Needs to be accessible by all nodes (file://, hdfs://, http://)
-		//PROVISIONING_SHARED_URI = "hdfs://streams_mesos_provision",
-		PROVISIONING_SHARED_URI = "file://home/bmwilli/tmp",
+		//MESOS_FETCH_PARENT_URI_DEFAULT = "hdfs://streams_mesos_provision",
+		MESOS_FETCH_PARENT_URI_DEFAULT = "file://tmp",
 		RES_STREAMS_BIN = "StreamsResourceInstall.tar",
 		RES_STREAMS_BIN_NAME = "STREAMS_BIN"
 	;
@@ -74,14 +75,18 @@ public class StreamsMesosConstants {
 	public static final String
 		RM_PROPERTIES_FILE = "streams-mesos.properties"
 	;
-	// AM properties
+	// Streams Mesos Property Names
 	public static final String
+		PROPS_MESOS_MASTER="MESOS_MASTER",
+		PROPS_FRAMEWORK_NAME="MESOS_FRAMEWORK_NAME",
+		PROPS_MESOS_USER="MESOS_USER",
 		PROPS_DC_CORES="DC_CORES",
 		PROPS_DC_MEMORY="DC_MEMORY",
 		PROPS_WAIT_SYNC = "WAIT_SYNC_SECS",
 		PROPS_WAIT_ASYNC = "WAIT_ASYNC_SECS",
 		PROPS_WAIT_FLEXIBLE="WAIT_FLEXIBLE_SECS",
-		PROPS_WAIT_HEARTBEAT="WAIT_HEARTBEAT_SECS"
+		PROPS_WAIT_HEARTBEAT="WAIT_HEARTBEAT_SECS",
+		PROPS_MESOS_FETCH_PARENT_URI="MESOS_FETCH_PARENT_URI"
 	;
 	/* Mesos resource allocation defaults */
 	public static final double

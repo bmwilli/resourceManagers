@@ -51,6 +51,7 @@ public class StreamsMesosScheduler implements Scheduler {
 	StreamsMesosResourceManager _manager;
 	StreamsMesosState _state;
 	SchedulerDriver _schedulerDriver = null;
+	String _lastErrorMessage = null;
 
 	/**
 	 * @param streamsRM
@@ -60,6 +61,15 @@ public class StreamsMesosScheduler implements Scheduler {
 		_manager = manager;
 		_state = state;
 	}
+
+	
+	
+	public String getLastErrorMessage() {
+		return _lastErrorMessage;
+	}
+
+
+
 
 	/*
 	 * (non-Javadoc)
@@ -81,6 +91,8 @@ public class StreamsMesosScheduler implements Scheduler {
 	@Override
 	public void error(SchedulerDriver schedulerDriver, String s) {
 		LOG.info("We got an error: " + s);
+		_lastErrorMessage = s;
+		schedulerDriver.stop();
 	}
 
 	/*
