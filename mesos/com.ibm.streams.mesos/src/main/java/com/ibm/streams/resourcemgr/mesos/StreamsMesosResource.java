@@ -404,6 +404,11 @@ class StreamsMesosResource {
 		if (_argsMap.containsKey(StreamsMesosConstants.DEPLOY_ARG)) {
 			// run the streams resource installer
 			// create softlink for StreamsLink
+			cmdBuffer.append(";./StreamsResourceInstall/streamsresourcesetup.sh");
+			cmdBuffer.append(" --install-dir ./InfoSphereStreams");
+			cmdBuffer.append(" &> streamsinstall.out || exit 1");
+			cmdBuffer.append(";cat ./InfoSphereStreams/.streams.version.dir | ");
+			cmdBuffer.append(" xargs -I '{}' ln -s './InfoSphereStreams/{}' StreamsLink");
 		} else {
 			// if --deploy not set, we assume streams is installed on all
 			// machines
