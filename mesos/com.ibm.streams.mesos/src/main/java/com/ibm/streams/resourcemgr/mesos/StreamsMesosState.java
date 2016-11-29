@@ -120,6 +120,17 @@ public class StreamsMesosState {
 		return smr;
 	}
 	
+	// Re-request resource means put it back on the requestedResources list
+	// Usually called when a failure occurs before Streams notified
+	// Example is a problem with mesos slave that prevents controller from running
+	private void requestNewResource(StreamsMesosResource smr) {
+		LOG.info("Re-requsting resource " + smr.getId());
+		smr.setResourceState(ResourceState.NEW);
+		smr.setTaskCompletionStatus(null);
+		smr.setTaskId(null);
+		_requestedResources.add(smr);
+	}
+	
 	public Map<String, StreamsMesosResource> getAllResources() {
 		return _allResources;
 	}
@@ -161,7 +172,7 @@ public class StreamsMesosState {
 	
 	public StreamsMesosResource getResourceByTaskId(String taskId) {
 		for (StreamsMesosResource smr : _allResources.values()) {
-			if (smr.isAllocated()) {
+			if (smr.getTaskId() != null) {
 				if (smr.getTaskId().equals(taskId)) {
 					return smr;
 				} 
@@ -182,6 +193,15 @@ public class StreamsMesosState {
 			LOG.warn("taskLaunched from state failed to find resource (id: " + resourceId + ")");
 		}
 
+	}
+	
+	public void setAllocated(String resourceId) {
+		StreamsMesosResource smr = getResource(resourceId);
+		if (smr != null) {
+			smr.setRequestState(StreamsMesosResource.RequestState.ALLOCATED);
+		} else {
+			LOG.warn("setAllocated from state failed to find resource (id: " + resourceId + ")");
+		}		
 	}
 	
 	public void setPending(String resourceId) {
@@ -274,16 +294,17 @@ public class StreamsMesosState {
 			boolean changed = (oldResourceState != newResourceState) ? true:false;
 			
 			if (changed) {
-				LOG.info("Resource state of " + smr.getId() + " changed from " + oldResourceState + " to " + newResourceState);
+				LOG.info("Resource state of " + smr.getId() + " changed from " + oldResourceState + " to " + newResourceState + " and Request state is " + requestState);
 			
 			
 				// LAUNCHED ?? Anything to do?
 				
 				// RUNNING
 				if (newResourceState == ResourceState.RUNNING && requestState == RequestState.NEW) {
-					LOG.info("Resource " + smr.getId() + " is now RUNNING and RequestState was NEW, changing RequestState to ALLOCATED");
+					LOG.info("Resource " + smr.getId() + " is now RUNNING and RequestState was NEW, no action required allocateResources will notice its running and set requestStatus to ALLOCATED");
 					//Allocated within time so no need to notify client
-					smr.setRequestState(RequestState.ALLOCATED);
+					// Let the StreamsMesosResourceManager wait loop set it to allocated when it sees it RUNNING
+					//smr.setRequestState(RequestState.ALLOCATED);
 				} else if (newResourceState == ResourceState.RUNNING && requestState == RequestState.PENDING) {
 					LOG.info("Resource " + smr.getId() + " is now RUNNING and RequestState was PENDING, changing RequestState to ALLOCATED and notifying Streams");
 					// Need to notify client
@@ -300,9 +321,24 @@ public class StreamsMesosState {
 				// FAILED - abnormal
 				// This may be where we need to notify streams something bad happened
 				} else if (newResourceState == ResourceState.FAILED) {
-					LOG.info("Resource " + smr.getId() + " is now FAILED, changing RequestState to RELEASED, Notifying Streams of revoke");
-					smr.setRequestState(RequestState.RELEASED);
-					smr.notifyClientRevoked();
+					// If the Failure occured before we notified Streams, then we can just let it die and put back on newRequestList
+					// This is a case when a slave has issues
+					if (requestState == RequestState.NEW) {
+						LOG.warn("Resource " + smr.getId() + " Failed with requestState NEW, put back on newRequestList");
+						requestNewResource(smr);
+					} else if (requestState == RequestState.ALLOCATED) {
+						LOG.warn("Resource " + smr.getId() + " Failed with requestState ALLOCATED, notify Streams of revoke");
+						smr.setRequestState(RequestState.RELEASED);
+						smr.notifyClientRevoked();
+					} else if (requestState == RequestState.PENDING) {
+						LOG.warn("Resource " + smr.getId() + " Failed with requestState PENDING, notify Streams of revoke");
+						smr.setRequestState(RequestState.RELEASED);
+						smr.notifyClientRevoked();		
+					} else if (requestState == RequestState.CANCELLED || requestState == RequestState.RELEASED) {
+						LOG.warn("Resource " + smr.getId() + " Failed with requestState " + requestState + ", no action required, but not sure why task was still running to have a status update");
+					}
+				} else {
+					LOG.info("Change in task status update did not require any action.");
 				}
 			}
 
@@ -317,14 +353,17 @@ public class StreamsMesosState {
 // *** WE ARE HERE ***//
 	// Handle cancelling a resource request
 	public void cancelPendingResource(ResourceDescriptor descriptor) throws ResourceManagerException {
+		LOG.info("CancelPendingResource: " + descriptor);
 		StreamsMesosResource smr = getResource(getResourceId(descriptor));
 		if (smr != null) {
 			// So what state is it in?  What if we just allocated it?
 			// Update its request state
 			smr.setRequestState(RequestState.CANCELLED);
-			if (smr.isRunning()) {
+			// Need to cancel if running or launched
+			if (smr.isRunning() || smr.isLaunched()) {
 				// Its running so no need to remove from list of requsted resources, but need to stop it
-				LOG.info("Pending Resource (" + getResourceId(descriptor) + ") cancelled by streams, but it is already running, stopping...");
+				LOG.info("Pending Resource (" + getResourceId(descriptor) + ") cancelled by streams, but it is already launced or "
+						+ "running, stopping...");
 				smr.stop();
 			} else {
 				// Remove from the requested resource list if it is on it
@@ -403,7 +442,7 @@ public class StreamsMesosState {
         	if (_clientInfo.getClientId().equals(clientId)) {
         		client = _clientInfo;
         	} else {
-        		LOG.error("getClientInfo from state failed because clientId(" + clientId + ") does not match the client id we are working with (" + _clientInfo.getClientId() + ").");
+        		LOG.warn("getClientInfo from state failed because clientId(" + clientId + ") does not match the client id we are working with (" + _clientInfo.getClientId() + ").  Must be restarting a domain.");
         	}
         }
 
@@ -421,7 +460,7 @@ public class StreamsMesosState {
 	        if (_clientInfo == null) {
 	        	_clientInfo = client;
 	        } else if (!(_clientInfo.getClientId().equals(client.getClientId()))) {
-	        	LOG.error("setClientInfo on state failed because clientId(" + client.getClientId() + ") does not match the client id already set (" + _clientInfo.getClientId() + ").");
+	        	LOG.warn("setClientInfo on state failed because clientId(" + client.getClientId() + ") does not match the client id already set (" + _clientInfo.getClientId() + ").  Must be restarting a domain");
 	        } else {
 	        	// Setting to the same value so no need to do anything
 	        }

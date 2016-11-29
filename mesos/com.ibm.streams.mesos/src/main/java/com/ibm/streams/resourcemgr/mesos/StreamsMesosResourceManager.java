@@ -619,7 +619,8 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 				for (StreamsMesosResource smr : newAllocationRequests) {
 					LOG.trace("smr {id: " + smr.getId() + ", state: " + smr.getResourceState().toString() + "}");
 					if (smr.isRunning()) {
-						LOG.info("Resource is now running: " + smr);
+						LOG.info("Resource is now running: " + smr + ", setting to ALLOCATED");
+						_state.setAllocated(smr.getId());
 						allocCount++;
 					}
 				}
@@ -635,10 +636,10 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 		}
 		LOG.info("Finished waiting for new requests: allocated " + allocCount + " of " + newAllocationRequests.size() + " resources");
 		if (allocCount < newAllocationRequests.size()) {
-			LOG.info("Some did not get allocated, *** NEED TO IMPLEMENT PENDING ***");
+			LOG.info("Some did not get allocated");
 		}
 		// We have waited long enough
-		synchronized (this) {
+		synchronized (_scheduler) {
 			List<ResourceDescriptorState> descriptorStates = new ArrayList<ResourceDescriptorState>();
 			// Loop through them and set PENDING state for those not allocated so we know to notify
 			// when they are allocated

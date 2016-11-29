@@ -281,13 +281,16 @@ class StreamsMesosResource {
 		this._hostName = hostName;
 	}
 
+	public boolean isLaunched() {
+		return _resourceState == ResourceState.LAUNCHED;
+	}
+	
 	public boolean isRunning() {
-		// Fix for mesos
 		return _resourceState == ResourceState.RUNNING;
 	}
 	
 	public boolean isAllocated() {
-		return _taskId != null;
+		return _requestState == RequestState.ALLOCATED;
 	}
 
 	//public void cancel() {

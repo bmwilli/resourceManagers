@@ -38,6 +38,31 @@ keeps the parent process opened and shown as RUNNING in the Mesos web GUI.
 
 When a resource is released, the ResourcemanagerUtilities.stopController() command is executed and the shutdown of the controller is completed and Mesos marks the task as FINISHED.
 
+
+
+# Setup
+
+## Deployment Decisions
+The Streams Mesos Resource Manager supports two modes of streams runtime deployment: Pre-installed and Runtime-deployed
+### Runtime-deployed
+The `--deploy` option enables you to take advantage of the InfoSphere Streams provisioning features. When you specify this option, Mesos copies and extracts the installer for each container. To avoid timeout issues for both the Mesos executor and Streams do the following:
+#### Mesos
+Increase the `executor_registration_timout` for all mesos slaves to at least 5mins before you use the Streams Resource Manager
+>Example: echo "5mins" > /etc/mesos-slave/executor_registration_timeout
+
+The reason for this change is that mesos only waits 1 minute by default for tasks to become active.  When runtime deployment is used, the Mesos fetcher must fetch and untar the Streams resource package.  Depending on the system resources, this can take more than 1 minute, causing the task to FAIL.
+	
+#### Streams
+Set the domain property `domain.serviceStartTimeout` to at least 300 before you start the domain.
+>Example: streamtool mkdomain --property domain.serviceStartTimeout=300 --property domain.externalResourceManager=mesos
+
+The reason for this change is that mesos command executor must wait for the streams resource package to be installed before it can start the streams controller, however, it reports the task as RUNNING before this is complete.  Increasing this value allows Streams to wait patiently for this rather than failing the startdomain command.
+
+### Pre-installed
+If you choose not use the `--deploy` option, the Streams software should be installed on all of the mesos-slaves in a consistent location (e.g. /opt/ibm/InfoSphere_Streams)
+Note: At this time, the location on the mesos slaves must be the same as on the node where `streams-on-mesos` command is run.
+This will made into a property or argument in a future version.
+
 # A few commands:
 
 ## mkdomain command
@@ -66,78 +91,13 @@ Use Maven to compile the source code for the application in the InfoSphere Strea
 2. Extract the contents of the tar.gz file into a directory of your choice, change to that directory, and run the application.
 
 
-## Testing on Linux Workstation
-I have not tested these instructions yet
-
-1. Build and Install Mesos (I used 1.0.1)
-
-	See Mesos instructions
-
-	export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/local/lib"
-
-2. Run standalone Mesos and Slave (no zookeeper)
-
-	mesos-master --ip=127.0.0.1 --work_dir=/var/lib/mesos
-	mesos-agent --master=127.0.0.1:5050 --work_dir=/var/lib/mesos
-
-
-3. Run zookeeper (from docker) (for Streams).
-
-	docker run -d \
-	-p 2181:2181 \
-	-p 2888:2888 \
-	-p 3888:3888 \
-	jplock/zookeeper
-
-	export STERAMS_ZKCONNECT=localhost:2181
-
-4. Run streams-on-mesos using standalone master uri
-
-	cd scripts
-	./streams-on-mesos start --master localhost:5050 --deploy
-
-
 ## Helpful Notes
 
 If you ever need to stop an inactive framework in mesos:
 
 	curl -XPOST http://localhost:5050/master/teardown -d 'frameworkId=2fabdf51-36b0-4951-9138-719f56ba1ae7-0000'
 
-## Testing on Workstation with Docker for development
 
-
-0. Get IP Address of Docker Server
-
-	export HOST_IP=127.0.0.1
-
-1. Run zookeeper.
-
-	docker run -d \
-	> -p 2181:2181 \
-	> -p 2888:2888 \
-	> -p 3888:3888 \
-	> garland/zookeeper
-
-	export STERAMS_ZKCONNECT=localhost:2181
-
-2. Ensure Streams variables set
-
-	source <streams install location>/4.2.0.0/bin/streamsprofile.sh
-
-3. Start Mesos Master
-
-	docker run --net="host" \
-	-p 5050:5050 \
-	-e "MESOS_HOSTNAME=${HOST_IP}" \
-	-e "MESOS_IP=${HOST_IP}" \
-	-e "MESOS_ZK=zk://${HOST_IP}:2181/mesos" \
-	-e "MESOS_PORT=5050" \
-	-e "MESOS_LOG_DIR=/var/log/mesos" \
-	-e "MESOS_QUORUM=1" \
-	-e "MESOS_REGISTRY=in_memory" \
-	-e "MESOS_WORK_DIR=/var/lib/mesos" \
-	-d \
-	garland/mesosphere-docker-mesos-master
 
 ## Limitations
 ### Streams Resource Manager Related

@@ -18,8 +18,10 @@ streamtool addresourcespec --numresources 1[exclusive]
 streamtool addresourcespec --numresources 1,ingest
 streamtool addresourcespec --numresources 1,ingest[exclusive]
 
-??? What causes CancelPendingRequests to get called by Streams?
-	A1: Stopping the instance while there are pending requests
+## Concern ISSUE!!
+* Using mesos CommandExecutor
+  - It may report running while command is still running streamsresourcesetup.sh and controller is not yet started
+  - Only way to get around this may be to implement our own executor that does not report running until it is
 
 ## To Do (Working notes to get version 0.1.0 ready)
 * Handle error condition when framework killed but zookeeper thinks domain is running
@@ -61,3 +63,73 @@ streamtool addresourcespec --numresources 1,ingest[exclusive]
 * Convert exceptions to ResourceManagerMessageException, did not see the API for that
 * Enhance logging (see Symphony resource manager)
 
+
+
+
+## Testing on Linux Workstation
+I have not tested these instructions yet
+
+1. Build and Install Mesos (I used 1.0.1)
+
+	See Mesos instructions
+
+	export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/local/lib"
+
+2. Run standalone Mesos and Slave (no zookeeper)
+
+	mesos-master --ip=127.0.0.1 --work_dir=/var/lib/mesos
+	mesos-agent --master=127.0.0.1:5050 --work_dir=/var/lib/mesos
+
+
+3. Run zookeeper (from docker) (for Streams).
+
+	docker run -d \
+	-p 2181:2181 \
+	-p 2888:2888 \
+	-p 3888:3888 \
+	jplock/zookeeper
+
+	export STERAMS_ZKCONNECT=localhost:2181
+
+4. Run streams-on-mesos using standalone master uri
+
+	cd scripts
+	./streams-on-mesos start --master localhost:5050 --deploy
+
+	
+	
+## Testing on Workstation with Docker for development
+
+
+0. Get IP Address of Docker Server
+
+	export HOST_IP=127.0.0.1
+
+1. Run zookeeper.
+
+	docker run -d \
+	> -p 2181:2181 \
+	> -p 2888:2888 \
+	> -p 3888:3888 \
+	> garland/zookeeper
+
+	export STERAMS_ZKCONNECT=localhost:2181
+
+2. Ensure Streams variables set
+
+	source <streams install location>/4.2.0.0/bin/streamsprofile.sh
+
+3. Start Mesos Master
+
+	docker run --net="host" \
+	-p 5050:5050 \
+	-e "MESOS_HOSTNAME=${HOST_IP}" \
+	-e "MESOS_IP=${HOST_IP}" \
+	-e "MESOS_ZK=zk://${HOST_IP}:2181/mesos" \
+	-e "MESOS_PORT=5050" \
+	-e "MESOS_LOG_DIR=/var/log/mesos" \
+	-e "MESOS_QUORUM=1" \
+	-e "MESOS_REGISTRY=in_memory" \
+	-e "MESOS_WORK_DIR=/var/lib/mesos" \
+	-d \
+	garland/mesosphere-docker-mesos-master
