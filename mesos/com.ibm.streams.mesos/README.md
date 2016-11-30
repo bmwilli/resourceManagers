@@ -48,13 +48,13 @@ The Streams Mesos Resource Manager supports two modes of streams runtime deploym
 The `--deploy` option enables you to take advantage of the InfoSphere Streams provisioning features. When you specify this option, Mesos copies and extracts the installer for each container. To avoid timeout issues for both the Mesos executor and Streams do the following:
 #### Mesos
 Increase the `executor_registration_timout` for all mesos slaves to at least 5mins before you use the Streams Resource Manager
->Example: echo "5mins" > /etc/mesos-slave/executor_registration_timeout
+>Example: `echo "5mins" > /etc/mesos-slave/executor_registration_timeout`
 
 The reason for this change is that mesos only waits 1 minute by default for tasks to become active.  When runtime deployment is used, the Mesos fetcher must fetch and untar the Streams resource package.  Depending on the system resources, this can take more than 1 minute, causing the task to FAIL.
 	
 #### Streams
 Set the domain property `domain.serviceStartTimeout` to at least 300 before you start the domain.
->Example: streamtool mkdomain --property domain.serviceStartTimeout=300 --property domain.externalResourceManager=mesos
+>Example: `streamtool mkdomain --property domain.serviceStartTimeout=300 --property domain.externalResourceManager=mesos`
 
 The reason for this change is that mesos command executor must wait for the streams resource package to be installed before it can start the streams controller, however, it reports the task as RUNNING before this is complete.  Increasing this value allows Streams to wait patiently for this rather than failing the startdomain command.
 

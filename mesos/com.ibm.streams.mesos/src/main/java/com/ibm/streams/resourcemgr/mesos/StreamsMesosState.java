@@ -123,8 +123,8 @@ public class StreamsMesosState {
 	// Re-request resource means put it back on the requestedResources list
 	// Usually called when a failure occurs before Streams notified
 	// Example is a problem with mesos slave that prevents controller from running
-	private void requestNewResource(StreamsMesosResource smr) {
-		LOG.info("Re-requsting resource " + smr.getId());
+	private void reLaunchResourceTask(StreamsMesosResource smr) {
+		LOG.info("Re-launching resource task" + smr.getId());
 		smr.setResourceState(ResourceState.NEW);
 		smr.setTaskCompletionStatus(null);
 		smr.setTaskId(null);
@@ -325,7 +325,7 @@ public class StreamsMesosState {
 					// This is a case when a slave has issues
 					if (requestState == RequestState.NEW) {
 						LOG.warn("Resource " + smr.getId() + " Failed with requestState NEW, put back on newRequestList");
-						requestNewResource(smr);
+						reLaunchResourceTask(smr);
 					} else if (requestState == RequestState.ALLOCATED) {
 						LOG.warn("Resource " + smr.getId() + " Failed with requestState ALLOCATED, notify Streams of revoke");
 						smr.setRequestState(RequestState.RELEASED);

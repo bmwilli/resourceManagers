@@ -32,10 +32,13 @@ import java.util.Set;
 import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.CommandInfo;
 import org.apache.mesos.Protos.Resource;
+import org.json.simple.JSONObject;
 
 import com.ibm.streams.resourcemgr.ClientInfo;
 import com.ibm.streams.resourcemgr.ResourceDescriptor;
+import com.ibm.streams.resourcemgr.ResourceDescriptor.ResourceKind;
 import com.ibm.streams.resourcemgr.ResourceDescriptorState;
+import com.ibm.streams.resourcemgr.ResourceDescriptorState.AllocateState;
 import com.ibm.streams.resourcemgr.ResourceManagerException;
 import com.ibm.streams.resourcemgr.ResourceManagerUtilities;
 
@@ -122,6 +125,8 @@ class StreamsMesosResource {
 	// Unique Identier used for identification within Framework and for Mesos
 	// Task ID
 	private String _resourceId;
+	// Streams Display name
+	private String _streamsDisplayName;
 	// Client Info that requested this resource
 	private ClientInfo _client;
 	// Resource manager
@@ -159,6 +164,7 @@ class StreamsMesosResource {
 	public StreamsMesosResource(String id, ClientInfo client, StreamsMesosResourceManager manager, Map<String, String> argsMap,
 			List<Protos.CommandInfo.URI> uriList) {
 		this._resourceId = id;
+		this._streamsDisplayName = StreamsMesosConstants.RESOURCE_TYPE + "_" + id;
 		this._client = client;
 		this._manager = manager;
 		this._domainId = client.getDomainId();
@@ -315,17 +321,20 @@ class StreamsMesosResource {
 	 * public boolean isRunning() { return isAllocated() &&
 	 * allocatedContainer.getWrapperState() == ContainerWrapperState.RUNNING; }
 	 */
-
-	/* fix these for mesos, not sure why the two ways to getDescriptor */
+	
 	public ResourceDescriptor getDescriptor() {
-		// if(allocatedContainer != null)
-		// return allocatedContainer.getDescriptor();
-		return StreamsMesosResourceManager.getDescriptor(_resourceId, getHostName());
+		return new ResourceDescriptor(StreamsMesosConstants.RESOURCE_TYPE, ResourceKind.CONTAINER, _resourceId,
+				_streamsDisplayName, _hostName);
+
 	}
 
 	public ResourceDescriptorState getDescriptorState() {
-		return StreamsMesosResourceManager.getDescriptorState(isRunning(), getDescriptor());
+		AllocateState s = isRunning() ? AllocateState.ALLOCATED : AllocateState.PENDING;
+		return new ResourceDescriptorState(s, getDescriptor());
 	}
+	
+	
+	
 
 	// OLD UNUSED FROM YARN
 	public List<String> getStartupCommand(String installPath, String homeDir, boolean deployStreams) {
@@ -447,8 +456,7 @@ class StreamsMesosResource {
 		double task_memory = getMemory();
 
 		// Create taskId
-		Protos.TaskID taskIdProto = Protos.TaskID.newBuilder().setValue(getId()).build();
-		setTaskId(taskIdProto.getValue());
+		Protos.TaskID taskIdProto = generateTaskId(getId());
 		
 		// Set Host it will be run on
 		setHostName(offer.getHostname());
@@ -488,6 +496,15 @@ class StreamsMesosResource {
 
 	private Protos.Value.Scalar.Builder buildScalar(double value) {
 		return Protos.Value.Scalar.newBuilder().setValue(value);
+	}
+	
+	// Create the Mesos task ID based on the resource ID
+	// Example: resource_5 => streams_resource_5_0
+	private Protos.TaskID generateTaskId(String resourceId) {
+		String taskid = Utils.generateNextId(StreamsMesosConstants.MESOS_TASK_ID_PREFIX + resourceId);
+		setTaskId(taskid);
+
+		return Protos.TaskID.newBuilder().setValue(taskid).build(); 
 	}
 	
 	public void stop() {
@@ -555,5 +572,19 @@ class StreamsMesosResource {
 				", hostName=" + _hostName +
 				", taskCompletionStatus=" + _taskCompletionStatus +
 				"]";
+	}
+	
+	public JSONObject toJsonObject() {
+		JSONObject resource = new JSONObject();
+		resource.put(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_ID, getId());
+		resource.put(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_STREAMS_ID, _streamsDisplayName);
+		resource.put(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_TASK_ID, _taskId);
+		resource.put(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_RESOURCE_STATE, _resourceState.toString());
+		resource.put(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_REQUEST_STATE, _requestState.toString());
+		resource.put(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_COMPLETION_STATUS, _taskCompletionStatus.toString());
+		resource.put(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_HOST_NAME, _hostName);
+		resource.put(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_IS_MASTER, _isMaster);
+
+		return resource;
 	}
 }

@@ -75,6 +75,8 @@ try:
 		options, remainder = getopt.getopt(sys.argv[2:], "d:", ["zkconnect=", "domain-id=", "type=", "force"])
 	elif(sys.argv[1] == "status"):
 		options, remainder = getopt.getopt(sys.argv[2:], "d:", ["zkconnect=", "domain-id=", "type=", "all"])
+	elif(sys.argv[1] == "getresourcestate"):
+		options, remainder = getopt.getopt(sys.argv[2:], "d:", ["zkconnect="])
 	else :
 		print_help("Unknown command: " + sys.argv[1])
 		sys.exit()
@@ -237,4 +239,13 @@ elif(sys.argv[1] == "status"):
 	rc = system(command)
 	if(rc != 0):
 		sys.exit(1)
-
+elif(sys.argv[1] == "getresourcestate"):
+	command = (java_command
+		+ " -cp " + java_cp
+		+ " com.ibm.streams.resourcemgr.mesos.command.GetResourceState"
+		)
+	if not wasZkSet:
+		command = command + " --zkconnect " + zk
+	rc = system(command)
+	if(rc != 0):
+		sys.exit(1)

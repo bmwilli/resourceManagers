@@ -63,6 +63,11 @@ under the License.
   		<scope>system</scope>
   		<systemPath>${JAVA_HOME}/lib/tools.jar</systemPath>
   	</dependency>
+  	<dependency>
+  		<groupId>com.googlecode.json-simple</groupId>
+  		<artifactId>json-simple</artifactId>
+  		<version>1.1</version>
+  	</dependency>
   </dependencies>
   <build>
   <sourceDirectory>.</sourceDirectory>

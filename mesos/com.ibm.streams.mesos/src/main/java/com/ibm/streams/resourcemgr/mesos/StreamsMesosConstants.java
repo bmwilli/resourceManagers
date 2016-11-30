@@ -35,6 +35,7 @@ public class StreamsMesosConstants {
 	/* Identification Constants */
 	public static final String
 		RESOURCE_TYPE = "mesos",
+		MESOS_TASK_ID_PREFIX = "streams_",
 		FRAMEWORK_NAME_DEFAULT = "IBMStreamsRM",
 		MESOS_USER_DEFAULT = ""
 	;
@@ -109,6 +110,21 @@ public class StreamsMesosConstants {
 	/* Polling interval, how long to sleep between polling checks */
 	public static final long SLEEP_UNIT_MILLIS = 500;
 
-
+	/* Custom Command Constants */
+	public static final String
+		CUSTOM_COMMAND="command",
+		CUSTOM_COMMAND_GET_RESOURCE_STATE="getresourcestate",
+		CUSTOM_RESULT_RESOURCES="resources",
+		CUSTOM_RESULT_RESOURCE_ID="nativeId",
+		CUSTOM_RESULT_RESOURCE_STREAMS_ID="id",
+		CUSTOM_RESULT_RESOURCE_TASK_ID="mesosTaskId",
+		CUSTOM_RESULT_RESOURCE_RESOURCE_STATE="resourceState",
+		CUSTOM_RESULT_RESOURCE_REQUEST_STATE="requestState",
+		CUSTOM_RESULT_RESOURCE_COMPLETION_STATUS="taskCompletionStatus",
+		CUSTOM_RESULT_RESOURCE_HOST_NAME="hostname",
+		CUSTOM_RESULT_RESOURCE_IS_MASTER="master",
+		
+		CUSTOM_COMMAND_RETURN_CODE="rc"
+	;
 
 }

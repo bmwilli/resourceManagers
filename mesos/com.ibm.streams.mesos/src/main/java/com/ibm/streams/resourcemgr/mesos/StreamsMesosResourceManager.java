@@ -36,6 +36,11 @@ import org.apache.mesos.Scheduler;
 import org.apache.mesos.Protos.CommandInfo;
 import org.apache.mesos.Protos.FrameworkInfo;
 
+import org.json.simple.parser.JSONParser;
+import org.json.simple.parser.ParseException;
+import org.json.simple.JSONObject;
+import org.json.simple.JSONArray;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -253,8 +258,39 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 	}
 	
 	
-	
+	// Implement custom command handler to at least get internal state displayed
+	// Future should implement an HTTP interface and REST endpoint
     @Override
+	public String customCommand(ClientInfo client, String commandData, Locale locale) throws ResourceManagerException {
+    	JSONObject request;
+    	try {
+    		JSONParser parser = new JSONParser();
+    		request = (JSONObject) parser.parse(commandData);
+    	} catch (ParseException e) {
+    		LOG.error("Error parsing Custom Command from client " + client.getClientId());
+    		LOG.debug("Custom Command: " + commandData);
+    		throw new ResourceManagerException("Error parsing Custom Command from client " + client.getClientId(),e);
+    	}
+    	
+    	JSONObject response = new JSONObject();
+    	response.put(StreamsMesosConstants.CUSTOM_COMMAND_RETURN_CODE, new Integer(-1));
+    	String requestId = (String)request.get(StreamsMesosConstants.CUSTOM_COMMAND);
+    	if (requestId == null) {
+    		throw new ResourceManagerException("Custom Command not specified");
+    	}
+    	
+    	switch (requestId) {
+    	case StreamsMesosConstants.CUSTOM_COMMAND_GET_RESOURCE_STATE:
+    		getResourceState(request, response, client);
+    		break;
+    	default:
+    		throw new ResourceManagerException("Unknown command: " + requestId);
+    	}
+    	return response.toString();
+	}
+    
+
+	@Override
     public void validateTags(ClientInfo client, ResourceTags tags, Locale locale) throws ResourceTagException,
             ResourceManagerException {
 		LOG.info("StreamsResourceServer called validateTags()");
@@ -769,21 +805,20 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 		LOG.info("Created URI");
 	}
 	
-	
 	//////////////////////////////////////
-	/// STATIC METHODS
+	/// CUSTOM COMMANDS IMPLEMENTATION ///
 	//////////////////////////////////////
-
-	static ResourceDescriptor getDescriptor(String id, String host) {
-		return new ResourceDescriptor(StreamsMesosConstants.RESOURCE_TYPE, ResourceKind.CONTAINER, id,
-				StreamsMesosConstants.RESOURCE_TYPE + "_" + id, host);
-
-	}
-
-	static ResourceDescriptorState getDescriptorState(boolean isRunning, ResourceDescriptor rd) {
-		AllocateState s = isRunning ? AllocateState.ALLOCATED : AllocateState.PENDING;
-		return new ResourceDescriptorState(s, rd);
-	}
 	
-	
+	// Future put it its own class
+	public void getResourceState(JSONObject request, JSONObject response, ClientInfo client) {
+		JSONArray resources = new JSONArray();
+		
+		Map<String,StreamsMesosResource> allResources = _state.getAllResources();
+		for (StreamsMesosResource smr : allResources.values()) {
+			resources.add(smr.toJsonObject());
+		}
+		
+		response.put(StreamsMesosConstants.CUSTOM_RESULT_RESOURCES, resources);
+		response.put(StreamsMesosConstants.CUSTOM_COMMAND_RETURN_CODE, 0);
+	}
 }

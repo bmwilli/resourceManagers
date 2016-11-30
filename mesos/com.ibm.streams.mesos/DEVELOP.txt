@@ -22,6 +22,7 @@ streamtool addresourcespec --numresources 1,ingest[exclusive]
 * Using mesos CommandExecutor
   - It may report running while command is still running streamsresourcesetup.sh and controller is not yet started
   - Only way to get around this may be to implement our own executor that does not report running until it is
+  - Work around: Like YARN resource manager set domain.serviceStartTimeout=300
 
 ## To Do (Working notes to get version 0.1.0 ready)
 * Handle error condition when framework killed but zookeeper thinks domain is running
@@ -43,7 +44,8 @@ streamtool addresourcespec --numresources 1,ingest[exclusive]
 
 ## Development Questions:
 * sampleRM had a lot of logic about re-using resources that are already beeing used but were not excluded by the new allocateResources request.  Should we implement that?  When would you do that?  Would we do that in the case that we configured the resource manager to take entire offers?
-
+	* ANSWER Not required since we use containers.  Only required when giving out whole machines
+	* Could come into play if we truly accepted entire offer
 ## Future
 * Supress offers from mesos until there is a resource request
 * Handle multiple multiple clients (e.g. multiple domains)
@@ -52,7 +54,7 @@ streamtool addresourcespec --numresources 1,ingest[exclusive]
   * user would limit to single user if pam authentication used
 * Instructions and test for PKI authentication
 * Resource packing when offers have more resources that needed (see Building applications on mesos book)
-* If cpu and mem set to -1, then use entire offer for a resource...done
+* If cpu and mem set to -1, then use entire offer for a resource...done..not sure we really want to do this, so DONT
 * Marathon submission of framework
   * run streams-on-mesos from marathon
 * Streams Resource Manager custom commands to get internal state of allResources list, etc.
@@ -60,6 +62,8 @@ streamtool addresourcespec --numresources 1,ingest[exclusive]
 * Persistent State manager - see Symphony Resource Manager
 	* ValidateState
 * High Availability
+	* Mesos - Handle Master failover, Reconcile Tasks, Handle Scheduler failover
+	* Streams - Do the same
 * Convert exceptions to ResourceManagerMessageException, did not see the API for that
 * Enhance logging (see Symphony resource manager)
 
