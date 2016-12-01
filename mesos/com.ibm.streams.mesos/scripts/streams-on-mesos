@@ -43,6 +43,10 @@ COMMANDS = {
 	"status": Command("status",  "Displays status of the Streams Resource Manager Process.",
 			"\t[--zkconnect {<host>:<port>},...]\n"
 			+ "\t[-d,--domain-id <optional: domain identifier> | --all]\n" 
+			),
+	"getresourcestate": Command("getresourcestate", "Displays state of all resources and associated mesos tasks (displays old resources at this time also)",
+			"\t[--zkconnect {<host:<port>},...]\n"
+			+ "\t [-d, --domain-id <optional: domain identifier> | --all]\n"
 			)
 	}
 
@@ -76,7 +80,7 @@ try:
 	elif(sys.argv[1] == "status"):
 		options, remainder = getopt.getopt(sys.argv[2:], "d:", ["zkconnect=", "domain-id=", "type=", "all"])
 	elif(sys.argv[1] == "getresourcestate"):
-		options, remainder = getopt.getopt(sys.argv[2:], "d:", ["zkconnect="])
+		options, remainder = getopt.getopt(sys.argv[2:], "d:", ["zkconnect=", "domain-id=", "type=", "all"])
 	else :
 		print_help("Unknown command: " + sys.argv[1])
 		sys.exit()
@@ -118,6 +122,7 @@ deploy=False
 domain=domain_env
 wasDomainSet=False
 force=False
+wasAllSet=False
 
 for opt, arg in options:
 	if opt == "--zkconnect":
@@ -139,21 +144,35 @@ for opt, arg in options:
 	elif opt == "--type":
 		type = arg
 		wasTypeSet = True
+	elif opt == "--all":
+		wasAllSet = True
 	else:
 		sys.exit("Invalid option: " + opt)
 
 # zk must be specified
 test_var(zk, "ERROR: Zookeeper url not specified")
+
+
+# If all set, cannot set domain
+# if all not set, and no domain specified or in env then error
+if (wasAllSet and wasDomainSet):
+	sys.exit("--all and --domain are mutually exclusive, specify only one of them")
+	
 # domain must be specified (for now)
-test_var(domain, "ERROR: Domain name not specified")
+if (not wasAllSet):
+	test_var(domain, "ERROR: Domain name not specified as an argument or env variable")
 
 # Warn if HADOOP_CLASSPATH not set
 # In the future this should only happen if --deploy set and using HDFS as deploy area for mesos fetch
-usesHadoop = True
-hadoop_cp = getenv("HADOOP_CLASSPATH")
-if (hadoop_cp == None):
-	usesHadoop = False
-	print "WARNING: HADOOP_CLASSPATH not set, will get errors if you configure hdfs provisioning directory"
+needsHadoop = False
+usesHadoop = False
+if(sys.argv[1] == "start"):
+	needsHadoop = True
+if (needsHadoop):
+	hadoop_cp = getenv("HADOOP_CLASSPATH")
+	if (hadoop_cp == None):
+		usesHadoop = False
+		print "WARNING: HADOOP_CLASSPATH not set, will get errors if you configure hdfs provisioning directory"
 
 
 # Must use IBM Java packaged with Streams
@@ -165,7 +184,7 @@ streams_product_cp = ":".join([
 				  	streams_install + "/system/impl/lib/com.ibm.streams.platform.jar"
 		       		])
 
-java_cp = (streams_mesos_jar + ":"
+java_cp = (".:" + streams_mesos_jar + ":"
 	+ streams_install + "/lib/" + streams_product_cp)
 	
 if (usesHadoop):
@@ -220,7 +239,7 @@ elif(sys.argv[1] == "stop"):
 		else:
 			print "Streams Mesos Scheduler shutdown failed. Proceeding to a forced stop."
 	elif (not force):
-		print "Streams Mesos Scheduler stopped."
+		print "Streams Mesos Resource Manager stopped."
 		sys.exit(0)
 
 # status
@@ -231,6 +250,8 @@ elif(sys.argv[1] == "status"):
 		+ " ".join(sys.argv[1:])
 		+ " --status"
 		)
+	if not wasDomainSet:
+		command = command+ " -d " + domain
 	if not wasZkSet:
 		command = command + " --zkconnect " + zk 
 	if not wasTypeSet:
@@ -244,6 +265,8 @@ elif(sys.argv[1] == "getresourcestate"):
 		+ " -cp " + java_cp
 		+ " com.ibm.streams.resourcemgr.mesos.command.GetResourceState"
 		)
+	if not wasAllSet:
+		command = command+ " --domain-id " + domain
 	if not wasZkSet:
 		command = command + " --zkconnect " + zk
 	rc = system(command)

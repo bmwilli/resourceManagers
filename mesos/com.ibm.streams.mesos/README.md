@@ -63,6 +63,39 @@ If you choose not use the `--deploy` option, the Streams software should be inst
 Note: At this time, the location on the mesos slaves must be the same as on the node where `streams-on-mesos` command is run.
 This will made into a property or argument in a future version.
 
+
+# LOGGING
+## Java Messages
+Most error messages can be controlled by using a log4j.properties file.  streams-on-mesos adds "." to the classpath so you can create a log4j.properties file where you execute the command from
+
+A default log4j.properties is included in the .jar file for this package and can be found here:
+
+> src/main/resource/log4j.properties
+
+## Mesos Java API C++ Messages
+The Mesos Java API that this project was built with uses JNI internally and the underlying C/C++ has logging messages.
+Examples:
+<pre>
+    I1201 20:55:13.422004 12343 sched.cpp:330] New master detected at master@172.31.29.41:5050
+    I1201 20:55:13.422276 12343 sched.cpp:341] No credentials provided. Attempting to register without authentication
+    I1201 20:55:13.423632 12343 sched.cpp:743] Framework registered with a55e4e3f-a439-460e-80d6-d77d0ad66694-0024
+</pre>
+These can be controlled using environment variables:
+>	`export MESOS_QUIET=1 // Removes them all`
+
+>	`export MESOS_LOGGING_LEVEL=[ERROR,WARNING,INFO] // Sets the specific level`
+	
+## Zookeeper Client C++ Messages
+There are a few messages that are produced by the zookeeper C++ client of mesos.  Examples:
+<pre>
+    2016-12-01 21:14:48,162:13288(0x7f7e3c293700):ZOO\_INFO@log\_env@726: Client environment:zookeeper.version=zookeeper C client 3.4.8
+    2016-12-01 21:14:48,162:13288(0x7f7e3c293700):ZOO\_INFO@log\_env@730: Client environment:host.name=ip-172-31-29-41.ec2.internal
+    2016-12-01 21:14:48,162:13288(0x7f7e3c293700):ZOO\_INFO@log\_env@737: Client environment:os.name=Linux
+    2016-12-01 21:14:48,162:13288(0x7f7e3c293700):ZOO\_INFO@log\_env@738: Client environment:os.arch=3.10.0-327.36.3.el7.x86_64
+</pre>
+A solution to suppressing these messages is still being searched...do you have an answer?
+
+
 # A few commands:
 
 ## mkdomain command

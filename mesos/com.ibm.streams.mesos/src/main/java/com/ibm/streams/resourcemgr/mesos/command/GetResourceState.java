@@ -11,15 +11,20 @@ import org.json.simple.parser.JSONParser;
 
 import com.ibm.streams.resourcemgr.ClientConnection;
 import com.ibm.streams.resourcemgr.ClientConnectionFactory;
+import com.ibm.streams.resourcemgr.ResourceException;
 import com.ibm.streams.resourcemgr.mesos.StreamsMesosConstants;
 
 public class GetResourceState {
 	static public void main(String[] args) {
 		String zkConnect = null;
+		String domain = null;
 		for (int index = 0; index < args.length; ++index) {
 			String arg = args[index];
 			if (arg.equals(StreamsMesosConstants.ZK_ARG) && index + 1 < args.length) {
 				zkConnect = args[++index];
+			}
+			else if (arg.equals(StreamsMesosConstants.DOMAIN_ID_ARG) && index + 1 < args.length) {
+				domain = args[++index];
 			}
 		}
 		
@@ -34,9 +39,22 @@ public class GetResourceState {
 		ClientConnection client = null;
 		try {
 			// Connect to the Resource Manager
-			client = ClientConnectionFactory.createConnection("GetResourceStateCommand", StreamsMesosConstants.RESOURCE_TYPE, zkConnect, "StreamsDomain");
+			if (domain != null) {
+				client = ClientConnectionFactory.createConnection("GetResourceStateCommand", StreamsMesosConstants.RESOURCE_TYPE, zkConnect, domain);
+			}
+			else {
+				client = ClientConnectionFactory.createConnection("GetResourceStateCommand",  StreamsMesosConstants.RESOURCE_TYPE, zkConnect);
+			}
 			client.connect();
-			
+		} catch (ResourceException e) {
+			if (domain != null)
+				System.out.println("Error: Could not connect to Streams Mesos Resource Manager with domain = " + domain + ": " + e.toString());
+			else
+				System.out.println("Error: Could not connect to Streams Mesos Resource Manager for all domains (no domain specified): " + e.toString());
+			System.exit(1);
+		}
+		
+		try {
 			// Create the command json
 			JSONObject data = new JSONObject();
 			data.put(StreamsMesosConstants.CUSTOM_COMMAND, StreamsMesosConstants.CUSTOM_COMMAND_GET_RESOURCE_STATE);
@@ -50,15 +68,15 @@ public class GetResourceState {
 			JSONArray resources = (JSONArray)responseObj.get(StreamsMesosConstants.CUSTOM_RESULT_RESOURCES);
 			
 			// Create output table headings
-			String colHeadings[] = {"Native Name", "Display Name", "Mesos Task ID", "Resource State", "Request State", "Completion Status", "Host Name", "Is Master"};
+			String colHeadings[] = {"Display Name", "Native Name", "Mesos Task ID", "Resource State", "Request State", "Completion Status", "Host Name", "Is Master"};
 
 			// Get the table body
 			List<String[]> tableBody = new ArrayList<String[]>();
 			for (Object obj : resources.toArray()) {
 				String row[] = new String[colHeadings.length];
 				JSONObject resource = (JSONObject)obj;
-				row[0] = resource.get(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_ID).toString();
-				row[1] = resource.get(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_STREAMS_ID).toString();
+				row[0] = resource.get(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_STREAMS_ID).toString();
+				row[1] = resource.get(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_ID).toString();
 				row[2] = resource.get(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_TASK_ID).toString();
 				row[3] = resource.get(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_RESOURCE_STATE).toString();
 				row[4] = resource.get(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_REQUEST_STATE).toString();
