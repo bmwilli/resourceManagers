@@ -24,6 +24,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.apache.mesos.Protos;
+import org.apache.mesos.Protos.SlaveID;
 import org.apache.mesos.Protos.TaskStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -112,7 +113,7 @@ public class StreamsMesosState {
 		
 		
 		// Add to collections to track
-		LOG.info("Queuing new Resource Request: " + smr.toString());
+		LOG.debug("Queuing new Resource Request: " + smr.toString());
 		// These might be the same thing...need to determine this.
 		_allResources.put(smr.getId(), smr);
 		_requestedResources.add(smr);
@@ -124,7 +125,7 @@ public class StreamsMesosState {
 	// Usually called when a failure occurs before Streams notified
 	// Example is a problem with mesos slave that prevents controller from running
 	private void reLaunchResourceTask(StreamsMesosResource smr) {
-		LOG.info("Re-launching resource task" + smr.getId());
+		LOG.debug("Re-launching resource task" + smr.getId());
 		smr.setResourceState(ResourceState.NEW);
 		smr.setTaskCompletionStatus(null);
 		smr.setTaskId(null);
@@ -218,7 +219,7 @@ public class StreamsMesosState {
 	
 	private void mapAndUpdateMesosTaskStateToResourceState(StreamsMesosResource smr, Protos.TaskState taskState) {
 		// Handle the mapping and interpretation of mesos status update
-		
+	
 		StreamsMesosResource.ResourceState newResourceState = null;
 		StreamsMesosResource.TaskCompletionStatus newTaskCompletionStatus = null;
 		
@@ -254,6 +255,7 @@ public class StreamsMesosState {
 			newTaskCompletionStatus = StreamsMesosResource.TaskCompletionStatus.FAILED;
 			break;
 		default:
+			LOG.info("Mesos Scheduler notified of task status of " + smr.getTaskId() + " change to " + taskState + ", no action taken.");
 			newResourceState = null;
 			newTaskCompletionStatus = null;
 			break;
@@ -261,24 +263,28 @@ public class StreamsMesosState {
 		
 		
 		if (newResourceState != null) {
-			LOG.info("Mesos Task Status Update Mapped: Resource ID: " + smr.getId() + ", Resource State = " + newResourceState.toString() +
+			LOG.debug("Mesos Task Status Update Mapped: Resource ID: " + smr.getId() + ", Resource State = " + newResourceState.toString() +
 					", Task Completion Status = " + newTaskCompletionStatus.toString());
 			smr.setResourceState(newResourceState);
 			smr.setTaskCompletionStatus(newTaskCompletionStatus);
 		} else
-			LOG.info("Mesos Task Status Update was not mapped to a Resource State, no action");	
+			LOG.debug("Mesos Task Status Update was not mapped to a Resource State, no action");	
 	}
 	
 	
 	
 	// Handle the Status updates from Mesos
 	public void taskStatusUpdate(TaskStatus taskStatus) {
-		LOG.info("!!!!!!!!!!!! MESOS TASK STATUS UPDATE start !!!!!!!!!!!!!!!");
+		LOG.debug("!!!!!!!!!!!! MESOS TASK STATUS UPDATE start !!!!!!!!!!!!!!!");
 		
 		StreamsMesosResource.ResourceState oldResourceState, newResourceState;
 		StreamsMesosResource.RequestState requestState;
 		
 		String taskId = taskStatus.getTaskId().getValue();
+		String taskSlaveIP = "Unavailable";
+		try {
+			taskSlaveIP = taskStatus.getContainerStatus().getNetworkInfos(0).getIpAddresses(0).getIpAddress();
+		} catch (Exception e) {}
 		
 		StreamsMesosResource smr = getResourceByTaskId(taskId);
 
@@ -294,19 +300,19 @@ public class StreamsMesosState {
 			boolean changed = (oldResourceState != newResourceState) ? true:false;
 			
 			if (changed) {
-				LOG.info("Resource state of " + smr.getId() + " changed from " + oldResourceState + " to " + newResourceState + " and Request state is " + requestState);
+				LOG.debug("Resource state of " + smr.getId() + " changed from " + oldResourceState + " to " + newResourceState + " and Request state is " + requestState);
 			
 			
 				// LAUNCHED ?? Anything to do?
 				
 				// RUNNING
 				if (newResourceState == ResourceState.RUNNING && requestState == RequestState.NEW) {
-					LOG.info("Resource " + smr.getId() + " is now RUNNING and RequestState was NEW, no action required allocateResources will notice its running and set requestStatus to ALLOCATED");
+					LOG.debug("Resource " + smr.getId() + " is now RUNNING and RequestState was NEW, no action required allocateResources will notice its running and set requestStatus to ALLOCATED");
 					//Allocated within time so no need to notify client
 					// Let the StreamsMesosResourceManager wait loop set it to allocated when it sees it RUNNING
 					//smr.setRequestState(RequestState.ALLOCATED);
 				} else if (newResourceState == ResourceState.RUNNING && requestState == RequestState.PENDING) {
-					LOG.info("Resource " + smr.getId() + " is now RUNNING and RequestState was PENDING, changing RequestState to ALLOCATED and notifying Streams");
+					LOG.debug("Resource " + smr.getId() + " is now RUNNING and RequestState was PENDING, changing RequestState to ALLOCATED and notifying Streams");
 					// Need to notify client
 					smr.setRequestState(RequestState.ALLOCATED);
 					smr.notifyClientAllocated();
@@ -315,7 +321,8 @@ public class StreamsMesosState {
 					
 				// STOPPED - normal
 				} else if (newResourceState == ResourceState.STOPPED) {
-					LOG.info("Resource " + smr.getId() + " is now STOPPED, changing RequestState to RELEASED.");
+					LOG.info("Resource " + smr.getId() + " task id " + taskId + " has stopped");
+					LOG.debug("  changing RequestState to RELEASED.");
 					smr.setRequestState(RequestState.RELEASED);
 	
 				// FAILED - abnormal
@@ -323,22 +330,25 @@ public class StreamsMesosState {
 				} else if (newResourceState == ResourceState.FAILED) {
 					// If the Failure occured before we notified Streams, then we can just let it die and put back on newRequestList
 					// This is a case when a slave has issues
+					LOG.warn("Resource " + smr.getId() + " with Mesos task Id " + taskId + " Failed on Mesos slave: " + taskSlaveIP);
+					LOG.warn("  Message: " + taskStatus.getMessage());
+					LOG.debug("taskStatus details: " + taskStatus);
 					if (requestState == RequestState.NEW) {
-						LOG.warn("Resource " + smr.getId() + " Failed with requestState NEW, put back on newRequestList");
+						LOG.warn("Resource " + smr.getId() + " request state is NEW, queuing to relaunch the task");
 						reLaunchResourceTask(smr);
 					} else if (requestState == RequestState.ALLOCATED) {
-						LOG.warn("Resource " + smr.getId() + " Failed with requestState ALLOCATED, notify Streams of revoke");
+						LOG.warn("Resource " + smr.getId() + " Failed with request state ALLOCATED, notify Streams of revoke");
 						smr.setRequestState(RequestState.RELEASED);
 						smr.notifyClientRevoked();
 					} else if (requestState == RequestState.PENDING) {
-						LOG.warn("Resource " + smr.getId() + " Failed with requestState PENDING, notify Streams of revoke");
+						LOG.warn("Resource " + smr.getId() + " Failed with request state PENDING, notify Streams of revoke");
 						smr.setRequestState(RequestState.RELEASED);
 						smr.notifyClientRevoked();		
 					} else if (requestState == RequestState.CANCELLED || requestState == RequestState.RELEASED) {
 						LOG.warn("Resource " + smr.getId() + " Failed with requestState " + requestState + ", no action required, but not sure why task was still running to have a status update");
 					}
 				} else {
-					LOG.info("Change in task status update did not require any action.");
+					LOG.debug("Change in task status update did not require any action.");
 				}
 			}
 
@@ -346,14 +356,13 @@ public class StreamsMesosState {
 			LOG.warn("taskStatusUpdate from state failed to find resource (TaskID: " + taskId + ")");
 			return;
 		}
-		LOG.info("!!!!!!!!!!!! MESOS TASK STATUS UPDATE stop !!!!!!!!!!!!!!!");
+		LOG.debug("!!!!!!!!!!!! MESOS TASK STATUS UPDATE stop !!!!!!!!!!!!!!!");
 
 	}
 	
-// *** WE ARE HERE ***//
 	// Handle cancelling a resource request
 	public void cancelPendingResource(ResourceDescriptor descriptor) throws ResourceManagerException {
-		LOG.info("CancelPendingResource: " + descriptor);
+		LOG.debug("CancelPendingResource: " + descriptor);
 		StreamsMesosResource smr = getResource(getResourceId(descriptor));
 		if (smr != null) {
 			// So what state is it in?  What if we just allocated it?
@@ -362,7 +371,7 @@ public class StreamsMesosState {
 			// Need to cancel if running or launched
 			if (smr.isRunning() || smr.isLaunched()) {
 				// Its running so no need to remove from list of requsted resources, but need to stop it
-				LOG.info("Pending Resource (" + getResourceId(descriptor) + ") cancelled by streams, but it is already launced or "
+				LOG.debug("Pending Resource (" + getResourceId(descriptor) + ") cancelled by streams, but it is already launced or "
 						+ "running, stopping...");
 				smr.stop();
 			} else {
@@ -424,18 +433,6 @@ public class StreamsMesosState {
      */
     public ClientInfo getClientInfo(String clientId) {
         ClientInfo client = null;
-        /*
-        try {
-            // ../clients/<clientId>
-            String clientJson = getPathProperty(getClientPath(clientId), "client");
-            if (clientJson != null) {
-                JSONObject json = JSONObject.parse(clientJson);
-                client = new ClientInformation(json);
-            }
-        } catch (Throwable t) {
-            Trace.logError(_manager.fgError(t.getMessage(), t), t);
-        }
-        */
         
         // Just ensure we are on the same page with the clientId requested
         if (_clientInfo != null) {
@@ -468,31 +465,6 @@ public class StreamsMesosState {
     		LOG.warn("setClientInfo on state failed because it was passed null client object");
     	}
 	    
-
-    	
-    	/*
-        try {
-            String clientId = client.getClientId();
-
-            // ../clients/<clientId>
-            String clientPath = getClientPath(clientId);
-            if (_persistence.exists(clientPath)) {
-                JSONObject json = ((ClientInformation)client).toJson();
-                Properties props = new Properties();
-                props.setProperty("client", json.serialize());
-                setPath(clientPath, props);
-                
-                // update requests with new client
-                for (SymphonyRequest request : _requests.values()) {
-                    request.setClient(client);
-                }
-            }
-        } catch (Throwable t) {
-            Trace.logError(_manager.fgError(t.getMessage(), t), t);
-        }
-        */
     }
-	
-	
 	
 }

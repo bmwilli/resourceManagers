@@ -72,7 +72,12 @@ A default log4j.properties is included in the .jar file for this package and can
 
 > src/main/resource/log4j.properties
 
-## Mesos Java API C++ Messages
+## C++ Messages
+The Mesos Java API uses JNI internally and the underlying C/C++ logs messages to stderr
+
+To prevent these messages from coming to the console (with different format than the log4j console appender you have configured) direct the stderr output of the streams-on-mesos command to a file: `streams-on-mesos start ... 2>stderr.out`
+
+### Mesos Java API C++ Messages
 The Mesos Java API that this project was built with uses JNI internally and the underlying C/C++ has logging messages.
 Examples:
 <pre>
@@ -85,7 +90,7 @@ These can be controlled using environment variables:
 
 >	`export MESOS_LOGGING_LEVEL=[ERROR,WARNING,INFO] // Sets the specific level`
 	
-## Zookeeper Client C++ Messages
+### Zookeeper Client C++ Messages
 There are a few messages that are produced by the zookeeper C++ client of mesos.  Examples:
 <pre>
     2016-12-01 21:14:48,162:13288(0x7f7e3c293700):ZOO\_INFO@log\_env@726: Client environment:zookeeper.version=zookeeper C client 3.4.8

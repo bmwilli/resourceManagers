@@ -28,11 +28,11 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.mesos.MesosSchedulerDriver;
 import org.apache.mesos.Protos;
-import org.apache.mesos.Scheduler;
 import org.apache.mesos.Protos.CommandInfo;
 import org.apache.mesos.Protos.FrameworkInfo;
 
@@ -49,9 +49,7 @@ import com.ibm.streams.resourcemgr.AllocateInfo.AllocateType;
 import com.ibm.streams.resourcemgr.AllocateMasterInfo;
 import com.ibm.streams.resourcemgr.ClientInfo;
 import com.ibm.streams.resourcemgr.ResourceDescriptor;
-import com.ibm.streams.resourcemgr.ResourceDescriptor.ResourceKind;
 import com.ibm.streams.resourcemgr.ResourceDescriptorState;
-import com.ibm.streams.resourcemgr.ResourceDescriptorState.AllocateState;
 import com.ibm.streams.resourcemgr.ResourceException;
 import com.ibm.streams.resourcemgr.ResourceManagerAdapter;
 import com.ibm.streams.resourcemgr.ResourceManagerException;
@@ -91,7 +89,7 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 	public StreamsMesosResourceManager(String[] args) throws StreamsMesosException {
 		LOG.debug("Constructing ResourceManagerAdapter: StreamsMesosResourceFramework");
 		LOG.debug("args: " + Arrays.toString(args));
-		LOG.trace("Enironment: " + _envs);
+		LOG.debug("Enironment: " + _envs);
 
 		_argsMap.clear();
 		for (int i = 0; i < args.length; i++) {
@@ -183,7 +181,7 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 	 */
 	@Override
 	public void initialize() throws ResourceManagerException {
-		LOG.debug("Initialize();");
+		LOG.info("Streams Mesos Resource Manager Initializing...");
 		
 		_state = new StreamsMesosState(this);
 
@@ -193,8 +191,9 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 			// or workstations that are overloaded
 			// In testing, saw issues where Streams Resource Manager Server would
 			// disconnect client.
-			if (_argsMap.containsKey(StreamsMesosConstants.DEPLOY_ARG)) {
-				LOG.info("Deploy flag set.  Calling provisionStreams...");
+			//if (_argsMap.containsKey(StreamsMesosConstants.DEPLOY_ARG)) {
+			if (_deployStreams) {
+				LOG.debug("Deploy flag set.  Calling provisionStreams...");
 				provisionStreams(_argsMap, _uriList, Utils.getProperty(getProps(), StreamsMesosConstants.PROPS_MESOS_FETCH_PARENT_URI, StreamsMesosConstants.MESOS_FETCH_PARENT_URI_DEFAULT));
 			}
 	
@@ -203,18 +202,19 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 			_master = Utils.getProperty(getProps(), StreamsMesosConstants.PROPS_MESOS_MASTER, StreamsMesosConstants.MESOS_MASTER_DEFAULT);
 			if (_argsMap.containsKey(StreamsMesosConstants.MESOS_MASTER_ARG))
 				_master = _argsMap.get(StreamsMesosConstants.MESOS_MASTER_ARG);
-			LOG.info("Mesos master set to: " + _master);
+			LOG.debug("Mesos master set to: " + _master);
 	
 			// Setup and register the Mesos Scheduler
-			LOG.info("About to call runMesosScheduler...");
+			LOG.trace("About to call runMesosScheduler...");
 	
 			runMesosScheduler(_master, _state);
 	
-			LOG.info("StreamsMesosResourceFramework.initialize() complete");
+			LOG.debug("StreamsMesosResourceFramework.initialize() complete");
 		} catch (StreamsMesosException e) {
 			LOG.error("Error caught initializing StreamsResourceManager: " + e.toString());
 			throw new ResourceManagerException(e.toString(), e);
 		}
+		LOG.info("Streams Mesos Resource Manager ready to receive requests from IBM Streams");
 	}
 
 	/*
@@ -225,12 +225,13 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 	 */
 	@Override
 	public void close() {
-		LOG.info("StreamsResourceServer called close()");
+		LOG.info("Streams Mesos Resource Manager shutting down at the request of the Streams Resource Server");
 		if (_driver != null) {
-			LOG.info("stopping the mesos driver...");
+			LOG.debug("stopping the mesos driver...");
 			Protos.Status driverStatus = _driver.stop();
-			LOG.info("...driver stopped, status: " + driverStatus.toString());
+			LOG.debug("...driver stopped, status: " + driverStatus.toString());
 		}
+		LOG.info("Streams Mesos Resource Manager shutdown complete");
 	}
 	
 	
@@ -238,7 +239,7 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
      * @see com.ibm.streams.resourcemgr.ResourceManagerAdapter#clientConnected(com.ibm.streams.resourcemgr.ClientInfo)
      */
 	public void clientConnected(ClientInfo clientInfo) {
-		LOG.info("Client connected: " + clientInfo);
+		LOG.debug("Client connected: " + clientInfo);
 		if (clientInfo.getClientName().equals("controller")) {
 			ClientInfo saved = _state.getClientInfo(clientInfo.getClientId());
 			if (saved != null) {
@@ -247,7 +248,7 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 
 				// install version has changed
 				if (version != null && savedVersion != null && !version.equals(savedVersion)) {
-					LOG.info("##### client=" + saved.getClientId() + " changed install version from=" + savedVersion
+					LOG.debug("##### client=" + saved.getClientId() + " changed install version from=" + savedVersion
 							+ " to=" + version);
 				}
 			}
@@ -262,13 +263,14 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 	// Future should implement an HTTP interface and REST endpoint
     @Override
 	public String customCommand(ClientInfo client, String commandData, Locale locale) throws ResourceManagerException {
+    	LOG.info("Custom command received");
+    	LOG.debug("  command: " + commandData);
     	JSONObject request;
     	try {
     		JSONParser parser = new JSONParser();
     		request = (JSONObject) parser.parse(commandData);
     	} catch (ParseException e) {
     		LOG.error("Error parsing Custom Command from client " + client.getClientId());
-    		LOG.debug("Custom Command: " + commandData);
     		throw new ResourceManagerException("Error parsing Custom Command from client " + client.getClientId(),e);
     	}
     	
@@ -293,7 +295,7 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 	@Override
     public void validateTags(ClientInfo client, ResourceTags tags, Locale locale) throws ResourceTagException,
             ResourceManagerException {
-		LOG.info("StreamsResourceServer called validateTags()");
+		LOG.trace("StreamsResourceServer called validateTags()");
         for (String tag : tags.getNames()) {
             TagDefinitionType definitionType = tags.getTagDefinitionType(tag);
             switch (definitionType) {
@@ -326,9 +328,10 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 	@Override
 	public ResourceDescriptor allocateMasterResource(ClientInfo clientInfo, AllocateMasterInfo request)
 			throws ResourceTagException, ResourceManagerException {
-		LOG.info("#################### allocate master start ####################");
-		LOG.info("Request: " + request);
-		LOG.info("ClientInfo: " + clientInfo);
+		LOG.info("Received request to allocate master resource");
+		LOG.debug("#################### allocate master start ####################");
+		LOG.debug("Request: " + request);
+		LOG.debug("ClientInfo: " + clientInfo);
 		
 		ResourceDescriptor descriptor = null;
 		
@@ -339,7 +342,7 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 		
 		descriptor =  lst.get(0).getDescriptor();
 
-		LOG.info("#################### allocate master end ####################");
+		LOG.debug("#################### allocate master end ####################");
 
 		return descriptor;
 	}
@@ -356,16 +359,17 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 	@Override
 	public Collection<ResourceDescriptorState> allocateResources(ClientInfo clientInfo, AllocateInfo request)
 			throws ResourceTagException, ResourceManagerException {
-		LOG.info("################### allocate start ###################");
-		LOG.info("Request: " + request);
-		LOG.info("ClientInfo: " + clientInfo);
+		LOG.info("Received request to allocate " + request.getCount() + " resources for instance " + request.getInstanceId() );
+		LOG.debug("################### allocate start ###################");
+		LOG.debug("Request: " + request);
+		LOG.debug("ClientInfo: " + clientInfo);
 		
 		Collection<ResourceDescriptorState> states = new ArrayList<ResourceDescriptorState>();
 		
 		states = allocateResources(clientInfo, false, request.getCount(), request.getTags(), request.getType());
 
 		
-		LOG.info("################### allocate end ###################");
+		LOG.debug("################### allocate end ###################");
 
 		return states;
 
@@ -380,11 +384,18 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 	@Override
 	public void releaseResources(ClientInfo client, Collection<ResourceDescriptor> descriptors, Locale locale)
 			throws ResourceManagerException {
+		LOG.debug("################ release specified resources start ################");
 
-		LOG.info("################ release specified resources start ################");
-		LOG.info("client: " + client);;
-		LOG.info("descriptors: " + descriptors);
-		LOG.info("locale: " + locale);
+		List<String> resourceList = new ArrayList<String>();
+		for (ResourceDescriptor rd : descriptors) {
+			resourceList.add(rd.getDisplayName());
+		}
+		String resourceListOutput = StringUtils.join(resourceList, ",");
+		LOG.info("Recieved request to release resources: " + resourceListOutput);
+		
+		LOG.debug("client: " + client);;
+		LOG.debug("descriptors: " + descriptors);
+		LOG.debug("locale: " + locale);
 		for (ResourceDescriptor rd : descriptors) {
 			//if (!_state.getAllResources().containsKey(rd.getNativeResourceId()))
 			//	throw new ResourceManagerException("No such resource: " + rd.getNativeResourceId());
@@ -393,7 +404,7 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 			_state.releaseResource(rd);
 		}
 		
-		LOG.info("################ release specified resources end ################");
+		LOG.debug("################ release specified resources end ################");
 
 	}
 
@@ -406,15 +417,16 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 	 */
 	@Override
 	public void releaseResources(ClientInfo client, Locale locale) throws ResourceManagerException {
-		LOG.info("################ release all client resources start ################");
-		LOG.info("client: " + client);;
-		LOG.info("locale: " + locale);
+		LOG.info("Received request to release all resources for client: " + client.getClientName());
+		LOG.debug("################ release all client resources start ################");
+		LOG.debug("client: " + client);;
+		LOG.debug("locale: " + locale);
 		//for (StreamsMesosResource smr : _state.getAllResources().values()) {
 		//	smr.stop(_scheduler);
 		//}
 		_state.releaseAllResources(client);
 		
-		LOG.info("################ release all client resources end ################");
+		LOG.debug("################ release all client resources end ################");
 	}
 
 	
@@ -427,15 +439,23 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 	@Override
 	public void cancelPendingResources(ClientInfo client, Collection<ResourceDescriptor> descriptors, Locale locale)
 			throws ResourceManagerException {
-		LOG.info("################ cancel Pending Resources start ################");
-		LOG.info("client: " + client);
-		LOG.info("descriptors: " + descriptors);
-		LOG.info("locale: " + locale);
+		LOG.debug("################ cancel Pending Resources start ################");
+		
+		List<String> resourceList = new ArrayList<String>();
+		for (ResourceDescriptor rd : descriptors) {
+			resourceList.add(rd.getDisplayName());
+		}
+		String resourceListOutput = StringUtils.join(resourceList, ",");
+		LOG.info("Recieved request to cancel pending resources: " + resourceListOutput);
+		
+		LOG.debug("client: " + client);
+		LOG.debug("descriptors: " + descriptors);
+		LOG.debug("locale: " + locale);
 		for (ResourceDescriptor rd : descriptors) {
 			_state.cancelPendingResource(rd);
 		}
 		
-		LOG.info("################ cancel Pending Resources end ################");
+		LOG.debug("################ cancel Pending Resources end ################");
 	}
 	
 	
@@ -469,7 +489,7 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 	@Override
 	public void trace(String message) {
 		//super.trace(message);
-		LOG.info("Streams: " + message);
+		LOG.debug("Streams: " + message);
 
 	}
 
@@ -493,21 +513,23 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 	private void runMesosScheduler(String mesosMaster, StreamsMesosState state) throws StreamsMesosException {
 		// private void runMesosScheduler(List<CommandInfo.URI>uriList, String
 		// mesosMaster) {
-		LOG.info("Creating new Mesos Scheduler...");
+		LOG.debug("Creating new Mesos Scheduler...");
 		// LOG.info("URI List: " + uriList.toString());
 		// LOG.info("commandInfo: " + getCommandInfo(uriList));;
 
 		_scheduler = new StreamsMesosScheduler(this, state);
 
-		LOG.info("Creating new MesosSchedulerDriver...");
-		_driver = new MesosSchedulerDriver(_scheduler, getFrameworkInfo(), mesosMaster);
+		LOG.debug("Creating new MesosSchedulerDriver...");
+		FrameworkInfo fwInfo = getFrameworkInfo();
+		_driver = new MesosSchedulerDriver(_scheduler, fwInfo, mesosMaster);
 
-		LOG.info("About to start the mesos scheduler driver...");
+		LOG.debug("About to start the mesos scheduler driver...");
 		Protos.Status driverStatus = _driver.start();
-		LOG.info("...start returned status: " + driverStatus.toString());
+		LOG.debug("...start returned status: " + driverStatus.toString());
 		if (driverStatus != Protos.Status.DRIVER_RUNNING) {
 			throw new StreamsMesosException(_scheduler.getLastErrorMessage());
 		}
+		LOG.info("Mesos Framework scheduler started: " + fwInfo.getName());
 	}
 
 
@@ -643,51 +665,55 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 		// Depending on the type (Synchronous, Asynchronous, Flexible, etc...)
 		// figure out how long to wait
 		int waitTimeSecs = getWaitSecs(rType, _props);
-		LOG.info("Waiting for the Streams Mesos Scheduler to allocate and run " + newAllocationRequests.size() + " resources, maxTime: "
+		LOG.debug("Waiting for the Streams Mesos Scheduler to allocate and run " + newAllocationRequests.size() + " resources, maxTime: "
 				+ (waitTimeSecs < 0 ? "unbounded" : waitTimeSecs));
 		long endTime = System.currentTimeMillis() + (waitTimeSecs * 1000);
 
 		// Wait and poll to see if any are allocated in the given time
-		int allocCount = 0;
+		int runningCount = 0;
 		while (waitTimeSecs < 0 || System.currentTimeMillis() < endTime) {
 			synchronized (this) {
 				LOG.trace("Polling the new requests...");
 				for (StreamsMesosResource smr : newAllocationRequests) {
 					LOG.trace("smr {id: " + smr.getId() + ", state: " + smr.getResourceState().toString() + "}");
 					if (smr.isRunning()) {
-						LOG.info("Resource is now running: " + smr + ", setting to ALLOCATED");
-						_state.setAllocated(smr.getId());
-						allocCount++;
+						LOG.debug("Resource " + smr.getId() + " Mesos task is now running, still could fail before we notify Streams");
+						runningCount++;
 					}
 				}
-				LOG.trace("Allocated Count: " + allocCount);
-				if (allocCount == newAllocationRequests.size()) {		
+				LOG.trace("Allocated Count: " + runningCount);
+				if (runningCount == newAllocationRequests.size()) {		
 					// We have them all, no need to continue to wait
-					LOG.info("Allocated Count (" + allocCount + ") equals new allocation requests (" + newAllocationRequests.size() + "), stop waiting and polling");
+					LOG.debug("Allocated Count (" + runningCount + ") equals new allocation requests (" + newAllocationRequests.size() + "), stop waiting and polling");
 					break;
 				}
 			}
 			LOG.trace("...waiting");
 			Utils.sleepABit(StreamsMesosConstants.SLEEP_UNIT_MILLIS);
 		}
-		LOG.info("Finished waiting for new requests: allocated " + allocCount + " of " + newAllocationRequests.size() + " resources");
-		if (allocCount < newAllocationRequests.size()) {
-			LOG.info("Some did not get allocated");
-		}
+		LOG.debug("Finished waiting for new requests: running " + runningCount + " of " + newAllocationRequests.size() + " resources");
+
 		// We have waited long enough
-		synchronized (_scheduler) {
+		// Now we need to notify Streams and set the requestState.  
+		// Synchronize on the whole _state because we need to really snapshot what we have told Streams
+		// so we know how to react to future task status changes
+		synchronized (_state) {
 			List<ResourceDescriptorState> descriptorStates = new ArrayList<ResourceDescriptorState>();
 			// Loop through them and set PENDING state for those not allocated so we know to notify
 			// when they are allocated
 			for (StreamsMesosResource smr : newAllocationRequests) {
 				descriptorStates.add(smr.getDescriptorState());
-				
+				// Now notify streams of the allocation or pending status of each resource
+				if (smr.isRunning()) {
+					LOG.info("Notifying Streams that the resource " + smr.getId() + " is allocated");
+					_state.setAllocated(smr.getId());
+				}
 				if (!smr.isAllocated()) {
-					LOG.info("Setting request status of request id " + smr.getId() + " to PENDING");
+					LOG.info("Notifying Streams that resource " + smr.getId() + " is pending");
 					_state.setPending(smr.getId());
 				}
 			}
-			LOG.info("Returning descriptorStates: " + descriptorStates);
+			LOG.debug("Returning descriptorStates: " + descriptorStates);
 			return descriptorStates;
 		}
 	}
@@ -725,8 +751,8 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 			String destinationRoot) throws StreamsMesosException, ResourceManagerException {
 		String streamsInstallable = null;
 		String workingDirFile = null;
-
-		LOG.info("Creating Streams Installable in work location.");
+		LOG.info("Preparing Streams deployable resource package");
+		LOG.debug("Creating Streams Installable in work location.");
 		workingDirFile = StreamsMesosConstants.PROVISIONING_WORKDIR_PREFIX + "." + (System.currentTimeMillis() / 1000);
 
 		try {
@@ -742,10 +768,10 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 			throw new StreamsMesosException("Failed to create Streams Resource Manager Package", e);
 		}
 
-		LOG.info("Created Streams Installable: " + streamsInstallable);
+		LOG.debug("Created Streams Installable: " + streamsInstallable);
 
 		// Get it to where we need it
-		LOG.info("Looking at destinationRoot(" + destinationRoot + ") to determine filesystem");
+		LOG.debug("Looking at destinationRoot(" + destinationRoot + ") to determine filesystem");
 		String destinationURI;
 		String destinationPath; // without prefix
 		if (destinationRoot.startsWith("file://")) {
@@ -787,12 +813,12 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 		}
 
 		// Remove working directory
-		LOG.info("Deleting Streams Installable from work location...");
+		LOG.debug("Deleting Streams Installable from work location...");
 		Utils.deleteDirectory(workingDirFile);
-		LOG.info("Deleted: " + streamsInstallable);
+		LOG.debug("Deleted: " + streamsInstallable);
 
 		// Create Mesos URI for provisioned location
-		LOG.info("Creating URI for: " + destinationURI);
+		LOG.debug("Creating URI for: " + destinationURI);
 		CommandInfo.URI.Builder uriBuilder;
 		uriBuilder = CommandInfo.URI.newBuilder();
 		// uriBuilder.setCache(true);
@@ -802,7 +828,7 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 		uriBuilder.setValue(destinationURI);
 
 		uriList.add(uriBuilder.build());
-		LOG.info("Created URI");
+		LOG.debug("Created URI");
 	}
 	
 	//////////////////////////////////////

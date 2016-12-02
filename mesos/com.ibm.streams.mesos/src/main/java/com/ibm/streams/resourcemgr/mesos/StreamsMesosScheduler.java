@@ -79,7 +79,7 @@ public class StreamsMesosScheduler implements Scheduler {
 	 */
 	@Override
 	public void disconnected(SchedulerDriver schedulerDriver) {
-		LOG.info("We got disconnected");
+		LOG.debug("Mesos Scheduler: disconnected callback ");
 	}
 
 	/*
@@ -90,7 +90,7 @@ public class StreamsMesosScheduler implements Scheduler {
 	 */
 	@Override
 	public void error(SchedulerDriver schedulerDriver, String s) {
-		LOG.info("We got an error: " + s);
+		LOG.info("Mesos Scheduler receieved an error from Mesos: " + s);
 		_lastErrorMessage = s;
 		schedulerDriver.stop();
 	}
@@ -104,7 +104,7 @@ public class StreamsMesosScheduler implements Scheduler {
 	 */
 	@Override
 	public void executorLost(SchedulerDriver schedulerDriver, ExecutorID executorID, SlaveID slaveID, int i) {
-		LOG.info("Lost executor on slave " + slaveID);
+		LOG.info("Mesos Scheduler received notification of Lost executor on slave " + slaveID + ", no action taken.");
 	}
 
 	/*
@@ -117,7 +117,7 @@ public class StreamsMesosScheduler implements Scheduler {
 	@Override
 	public void frameworkMessage(SchedulerDriver schedulerDriver, ExecutorID executorID, SlaveID slaveID,
 			byte[] bytes) {
-		LOG.info("Received message (scheduler);: " + new String(bytes) + " from " + executorID.getValue());
+		LOG.info("Mesos Scheduler received message: " + new String(bytes) + " from " + executorID.getValue() + ", no action taken.");
 	}
 
 	/*
@@ -128,7 +128,7 @@ public class StreamsMesosScheduler implements Scheduler {
 	 */
 	@Override
 	public void offerRescinded(SchedulerDriver schedulerDriver, OfferID offerID) {
-		LOG.info("This offer's been rescinded: " + offerID.toString());
+		LOG.info("Mesos Scheduler received notification that an offer has been rescinded: " + offerID.toString() + ", no action taken.");
 	}
 
 	/*
@@ -140,13 +140,12 @@ public class StreamsMesosScheduler implements Scheduler {
 	 */
 	@Override
 	public void registered(SchedulerDriver schedulerDriver, FrameworkID frameworkID, MasterInfo masterInfo) {
-		LOG.debug("Scheduler Registered: " + frameworkID);
+		LOG.info("Mesos Scheduler Registered with the Mesos Master on host: " + masterInfo.getHostname() + ":" + masterInfo.getPort());
+		LOG.debug("  Framwork ID assigned: " + frameworkID);
 
 		_schedulerDriver = schedulerDriver;
-		// LOG.debug("*** StreamsMesosResourceScheduler Registered !!");
-		// LOG.debug("*** Try and notify framework....");
-		// LOG.debug("*** calling streamsRM.testMessage()...returned: " +
-		// streamsRM.testMessage());
+		
+		LOG.info("Streams Mesos Resource Manager ready to receive offers and launch tasks on Mesos");
 
 	}
 
@@ -159,7 +158,7 @@ public class StreamsMesosScheduler implements Scheduler {
 	 */
 	@Override
 	public void reregistered(SchedulerDriver schedulerDriver, MasterInfo masterInfo) {
-		LOG.debug("Re-Registered");
+		LOG.info("Mesos Scheduler notifed of Re-Registered, no action taken.");
 	}
 
 	/*
@@ -198,26 +197,26 @@ public class StreamsMesosScheduler implements Scheduler {
 			List<StreamsMesosResource> satisfiedRequests = new ArrayList<StreamsMesosResource>();
 			
 			if (newRequestList.size() > 0)
-				LOG.info("resourceOffers found " + newRequestList.size() + " Resource Requests");
+				LOG.debug("resourceOffers made and there are " + newRequestList.size() + " Resource Requests");
 			
 			// Not packing multiple launches into an offer at this time so that we spread
 			// the resources across multiple Mesos slaves.
 			for (StreamsMesosResource smr : newRequestList) {
 			
-				LOG.info("Resource Request Available to compare to offer:");
-				LOG.info("smr: " + smr.toString());
-				LOG.info("offer: {cpu: " + offerCpus + ", mem: " + offerMem + ", id:" + offer.getId() + "}");
+				LOG.debug("Resource Request Available to compare to offer:");
+				LOG.debug("smr: " + smr.toString());
+				LOG.debug("offer: {cpu: " + offerCpus + ", mem: " + offerMem + ", id:" + offer.getId() + "}");
 				
 				// Check to ensure offer can meet this resources requirements
 				// If this logic gets more complicated move to its own function
 				if ((smr.getCpu() <= offerCpus) && (smr.getMemory() <= offerMem)) {
-					LOG.info("Offer meets requirements, building Task...");
+					LOG.debug("Offer meets requirements, building Task...");
 					usedOffer = true;
 				
 					Protos.TaskInfo task = smr.buildStreamsMesosResourceTask(offer);
-					LOG.info("Launching taskId: " + task.getTaskId() + "...");
+					LOG.info("Launching Mesos task for resource " + smr.getId() + " with task Id: " + task.getTaskId().getValue() + "...");
 					launchTask(schedulerDriver, offer, task);
-					LOG.info("...Launched taskId" + task.getTaskId());
+					LOG.debug("...Launched taskId" + task.getTaskId());
 
 					satisfiedRequests.add(smr);
 					// Tell resource manager we have satisfied the request and
@@ -226,7 +225,7 @@ public class StreamsMesosScheduler implements Scheduler {
 					//_state.updateResource(smr.getId(), StreamsMesosResource.ResourceState.LAUNCHED, StreamsMesosResource.TaskCompletionStatus.NONE);	
 
 				} else {
-					LOG.info("Offer did not meet requirements, maybe the next offer will.");
+					LOG.debug("Offer did not meet requirements, maybe the next offer will.");
 				}
 			} // end for each newRequest
 				
@@ -237,7 +236,7 @@ public class StreamsMesosScheduler implements Scheduler {
 			
 			// If offer was not used at all, decline it
 			if (!usedOffer) {
-				LOG.debug("Offer was not used, declining");
+				LOG.trace("Offer was not used, declining");
 				schedulerDriver.declineOffer(offer.getId());
 			}
 		} // end for each offer
@@ -253,9 +252,9 @@ public class StreamsMesosScheduler implements Scheduler {
 	}
 	
 	public void killTask(Protos.TaskID taskId) {
-		LOG.info("Calling _schedulerDriver.killTask(" + taskId + ")");
+		LOG.debug("Calling _schedulerDriver.killTask(" + taskId + ")");
 		Protos.Status status = _schedulerDriver.killTask(taskId);
-		LOG.info("killTask returned driver status: " + status.toString());
+		LOG.debug("killTask returned driver status: " + status.toString());
 	}
 
 	/*
@@ -267,7 +266,7 @@ public class StreamsMesosScheduler implements Scheduler {
 	 */
 	@Override
 	public void slaveLost(SchedulerDriver schedulerDriver, SlaveID slaveID) {
-		LOG.info("Lost slave: " + slaveID.getValue());
+		LOG.info("Mesos Scheduler received notification of Lost slave: " + slaveID.getValue() + ", no action taken.");
 	}
 
 	/*
@@ -280,7 +279,7 @@ public class StreamsMesosScheduler implements Scheduler {
 	@Override
 	public void statusUpdate(SchedulerDriver schedulerDriver, TaskStatus taskStatus) {
 		
-		LOG.info("Mesos Task Status update: " + taskStatus.getState() + " from " + taskStatus.getTaskId().getValue());
+		LOG.debug("Mesos Task Status update: " + taskStatus.getState() + " from " + taskStatus.getTaskId().getValue());
 		
 		_state.taskStatusUpdate(taskStatus);
 

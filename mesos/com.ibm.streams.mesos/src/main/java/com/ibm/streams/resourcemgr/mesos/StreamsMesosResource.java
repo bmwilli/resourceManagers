@@ -144,7 +144,6 @@ class StreamsMesosResource {
 	
 	private Set<String> _tags = new HashSet<String>();
 
-	private boolean _deployStreams;
 	private Map<String, String> _argsMap;
 	private List<Protos.CommandInfo.URI> _uriList;
 
@@ -299,28 +298,7 @@ class StreamsMesosResource {
 		return _requestState == RequestState.ALLOCATED;
 	}
 
-	//public void cancel() {
-	//	_cancelled = true;
-		// Fix for mesos
-		// if(allocatedContainer!=null)
-		// allocatedContainer.cancel();
-	//}
-
-	//public boolean isCancelled() {
-	//	return _cancelled;
-	//}
-
-	/*
-	 * fix for mesos public void setAllocatedContainer(ContainerWrapper cw) {
-	 * allocatedContainer = cw; allocatedContainer.setId(id); if(cancelled)
-	 * allocatedContainer.cancel(); } public ContainerWrapper
-	 * getAllocatedContainer() { return allocatedContainer; }
-	 */
-	/*
-	 * public boolean isAllocated() { return allocatedContainer != null; }
-	 * public boolean isRunning() { return isAllocated() &&
-	 * allocatedContainer.getWrapperState() == ContainerWrapperState.RUNNING; }
-	 */
+	
 	
 	public ResourceDescriptor getDescriptor() {
 		return new ResourceDescriptor(StreamsMesosConstants.RESOURCE_TYPE, ResourceKind.CONTAINER, _resourceId,
@@ -334,66 +312,6 @@ class StreamsMesosResource {
 	}
 	
 	
-	
-
-	// OLD UNUSED FROM YARN
-	public List<String> getStartupCommand(String installPath, String homeDir, boolean deployStreams) {
-		List<String> cmd = new ArrayList<String>();
-		cmd.add("export HOME=" + homeDir + ";");
-		if (!deployStreams) {
-			cmd.add(" source " + installPath + "/bin/streamsprofile.sh; ");
-			cmd.add(" ln -s " + installPath + " StreamsLink; ");
-		} else {
-			cmd.add(" echo 'NEED TO IMPLEMENT DEPLOYMENT';");
-			// cmd.add(" ls -lR > " + ApplicationConstants.LOG_DIR_EXPANSION_VAR
-			// + "/dir_contents_pre; ");
-			// cmd.add(" ./" + StreamsYarnConstants.RES_STREAMS_BIN +
-			// "/StreamsResourceInstall/streamsresourcesetup.sh"
-			// + " --install-dir ./InfoSphereStreams"
-			// + " &> " + ApplicationConstants.LOG_DIR_EXPANSION_VAR +
-			// "/streamsinstall || exit 1;");
-			// cmd.add(" source ./InfoSphereStreams/*/bin/streamsprofile.sh;");
-			// cmd.add(" cat $PWD/InfoSphereStreams/.streams.version.dir | " +
-			// " xargs -I '{}' ln -s '$PWD/InfoSphereStreams/{}' StreamsLink;");
-		}
-		// cmd.add(" ls -lR > " + ApplicationConstants.LOG_DIR_EXPANSION_VAR +
-		// "/dir_contents; ");
-		// cmd.add(" env > " + ApplicationConstants.LOG_DIR_EXPANSION_VAR +
-		// "/env ;");
-		// cmd.add(" cat launch*.sh > " +
-		// ApplicationConstants.LOG_DIR_EXPANSION_VAR + "/launch_context;");
-		cmd.add(ResourceManagerUtilities.getStartControllerCommand("$PWD/StreamsLink", getZkConnect(), getDomainId(),
-				getDescriptor(), getTags(), false, // false = do not fork
-				isMaster()));
-
-		// cmd.add(" &>" + ApplicationConstants.LOG_DIR_EXPANSION_VAR +
-		// "/application.log");
-		return cmd;
-	}
-	/*
-	 * public ContainerRequest getCreateResourceRequest() throws
-	 * UnknownHostException { if(request != null) return request; Priority
-	 * priority = Records.newRecord(Priority.class);
-	 * 
-	 * priority.setPriority(this.priority); Resource res =
-	 * Records.newRecord(Resource.class); if(memory > 0) res.setMemory(memory);
-	 * if(cpu > 0) res.setVirtualCores(cpu); request =new ContainerRequest( res,
-	 * null, //hosts null,//racks priority, true//relax locality ); return
-	 * request; }
-	 */
-
-	/*
-	 * public boolean matches(ContainerWrapper cWrapper) {
-	 * 
-	 * if(cWrapper == null) return false; if(priority !=
-	 * cWrapper.getContainer().getPriority().getPriority()) { return false; } //
-	 * if(cpu > 0 && cWrapper.getContainer().getResource().getVirtualCores() !=
-	 * cpu) { // return false; // } if( memory > 0 &&
-	 * cWrapper.getContainer().getResource().getMemory() < memory ) { return
-	 * false; }
-	 * 
-	 * return true; }
-	 */
 
 	/* Mesos Helper Methods */
 	/*
@@ -401,7 +319,7 @@ class StreamsMesosResource {
 	 * need a second version for differences between master streams resource
 	 * (when domain is started) and all others
 	 */
-	public CommandInfo getStreamsResourceCommand() {
+	public CommandInfo buildStreamsResourceStartupCommand() {
 
 		CommandInfo.Builder cmdInfoBuilder = Protos.CommandInfo.newBuilder();
 
@@ -477,7 +395,7 @@ class StreamsMesosResource {
 		}
 
 		// Get the commandInfo from the Streams Mesos Resource
-		Protos.CommandInfo commandInfo = getStreamsResourceCommand();
+		Protos.CommandInfo commandInfo = buildStreamsResourceStartupCommand();
 
 		// Work on getting this fillout out correctly
 		Protos.TaskInfo task = Protos.TaskInfo.newBuilder().setName(getId()).setTaskId(taskIdProto)
@@ -508,22 +426,23 @@ class StreamsMesosResource {
 	}
 	
 	public void stop() {
-		LOG.info("*** Stopping Resource: " + _resourceId);
+		LOG.debug("*** Requested to Stop Resource: " + _resourceId + ", resource State: " + _resourceState);
 		
 		switch(_resourceState) {
 		case NEW:
 		case STOPPING:
 		case STOPPED:
 		case FAILED:
-		case CANCELLED:
 			return; // nothing to do
 		default:
 			break;
 		}
+		
+		LOG.info("Stopping Streams controller and thus Mesos task: " + _resourceId);
 		setResourceState(ResourceState.STOPPING);
 		try {
 			ResourceDescriptor rd = getDescriptor();
-			LOG.info("Stopping Domain Controller: " + rd);
+			LOG.debug("Stopping Domain Controller: " + rd);
 			boolean clean = false;
 			//LOG.info("stopControllerCmd: " + ResourceManagerUtilities.getStopControllerCommandElements(
 			//		_argsMap.get(StreamsMesosConstants.INSTALL_PATH_ARG), getZkConnect(), getDomainId(), rd, clean));
@@ -546,14 +465,14 @@ class StreamsMesosResource {
 	public void notifyClientAllocated() {
 		Collection<ResourceDescriptor> descriptors = new ArrayList<ResourceDescriptor>();
 		descriptors.add(getDescriptor());
-		LOG.info("Sending resourcesAllocated notification for resource: " + getId());
+		LOG.info("Sending resourcesAllocated notification to Streams for resource: " + getId());
 		_manager.getResourceNotificationManager().resourcesAllocated(_client.getClientId(), descriptors);
 	}
 	
 	public void notifyClientRevoked() {
 		Collection<ResourceDescriptor> descriptors = new ArrayList<ResourceDescriptor>();
 		descriptors.add(getDescriptor());
-		LOG.info("Sending resourcesRevoked notification for resource: " + getId());
+		LOG.info("Sending resourcesRevoked notification to Streams for resource: " + getId());
 		_manager.getResourceNotificationManager().resourcesRevoked(_client.getClientId(), descriptors);
 	}
 

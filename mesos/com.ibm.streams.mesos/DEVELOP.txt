@@ -1,3 +1,17 @@
+## MAJOR ISSUES:
+* Large timeout for Streams seems to cause really slow reaction to things like:
+	* notify of revoke
+	* <wait>
+	* Requests release
+	* <wait>
+	* Streamtool exits that not enough resources could be allocated
+	
+* Mitigation: Add some delay between when task goes RUNNING and notifying streams
+* Why? Mesos Command Executor returns running when shell sharts running, but if Streams is going to fail
+* it will happen rather quickly in the case of pre-installed software, or it will take a long time if deploying
+* if it happens quicly we can retry and thus avoid telling Streams we have allocated the resource
+
+
 ## mkdomain command
 streamtool mkdomain --property domain.externalResourceManager=mesos
 
@@ -25,6 +39,17 @@ streamtool addresourcespec --numresources 1,ingest[exclusive]
   - Work around: Like YARN resource manager set domain.serviceStartTimeout=300
 
 ## To Do (Working notes to get version 0.1.0 ready)
+* Change to using controller.startTimeout to wait
+	* Retry failure situation (mv /opt/ibm to /opt/ibmxxx on slaves)
+		* Is it any faster to fail
+	* Retry deploy situation...does it wait long enough for it to come up?
+	
+* Check application.log in sandbox for java not found error
+
+* Suspend offers when no resources waiting
+
+* Handle type as an argument even down to resource display name naming
+	
 * Handle error condition when framework killed but zookeeper thinks domain is running
   * streamtool stopdomain --force will try and release resource...handle gracefully
 * Where is proper place to create descriptor?

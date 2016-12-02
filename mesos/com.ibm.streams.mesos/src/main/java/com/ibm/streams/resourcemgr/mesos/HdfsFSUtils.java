@@ -44,7 +44,7 @@ public class HdfsFSUtils {
 	
 	public static Path copyToHDFS(FileSystem hdfs, String hdfsPathPrefix, String localPath, String name) throws IOException {
 		Path hdfsPath = new Path(hdfs.getHomeDirectory(), getHDFSPath(hdfsPathPrefix, name));
-		LOG.info("copying local: " + localPath + " to hdfs: " + hdfsPath);
+		LOG.debug("copying local: " + localPath + " to hdfs: " + hdfsPath);
 		hdfs.copyFromLocalFile(new Path(localPath),  hdfsPath);
 		return hdfsPath;
 	}
@@ -57,7 +57,7 @@ public class HdfsFSUtils {
 		
 		FileSystem fs = FileSystem.get(conf);
 		
-		LOG.info("fs.getHomeDirectory();: " + fs.getHomeDirectory());
+		LOG.debug("fs.getHomeDirectory();: " + fs.getHomeDirectory());
 		
 		return fs;
 	}
