@@ -44,6 +44,10 @@ When a resource is released, the ResourcemanagerUtilities.stopController() comma
 
 ## Deployment Decisions
 The Streams Mesos Resource Manager supports two modes of streams runtime deployment: Pre-installed and Runtime-deployed
+> NOTE: It is recommended to setup your Mesos cluster with Pre-installed Streams runtime.  This greatly reduces the startup time of Streams Domains and Instances.  
+
+> NOTE: If you utilize the Runtime-deployed setup, it is suggested that you avoid making domain property changes when the streams-on-mesos Resource manager is running, the domain exists but is not running.  The reason is that Streams will attempt to start the Authentication and Authorization service, thus causing the a resource to be provisioned and released for the sole purpose of making a property change (which can take minutes to perform).  Instead, it is recommended that you shutdown the streams-on-mesos resource manager, remove and recreate the domain with the new properties.
+
 ### Runtime-deployed
 The `--deploy` option enables you to take advantage of the InfoSphere Streams provisioning features. When you specify this option, Mesos copies and extracts the installer for each container. To avoid timeout issues for both the Mesos executor and Streams do the following:
 #### Mesos
@@ -53,8 +57,8 @@ Increase the `executor_registration_timout` for all mesos slaves to at least 5mi
 The reason for this change is that mesos only waits 1 minute by default for tasks to become active.  When runtime deployment is used, the Mesos fetcher must fetch and untar the Streams resource package.  Depending on the system resources, this can take more than 1 minute, causing the task to FAIL.
 	
 #### Streams
-Set the domain property `domain.serviceStartTimeout` to at least 300 before you start the domain.
->Example: `streamtool mkdomain --property domain.serviceStartTimeout=300 --property domain.externalResourceManager=mesos`
+Set the domain property `controller.startTimeout` to at least 300 before you start the domain.
+>Example: `streamtool mkdomain --property controller.startTimeout=300 --property domain.externalResourceManager=mesos`
 
 The reason for this change is that mesos command executor must wait for the streams resource package to be installed before it can start the streams controller, however, it reports the task as RUNNING before this is complete.  Increasing this value allows Streams to wait patiently for this rather than failing the startdomain command.
 

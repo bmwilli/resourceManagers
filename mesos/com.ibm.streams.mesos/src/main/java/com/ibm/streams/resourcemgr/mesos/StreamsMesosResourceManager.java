@@ -76,6 +76,7 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 	private String _master;
 	private List<Protos.CommandInfo.URI> _uriList = new ArrayList<Protos.CommandInfo.URI>();
 	private boolean _deployStreams = false;
+	private long _waitAllocatedSecs = StreamsMesosConstants.WAIT_ALLOCATED_SECS_DEFAULT;
 
 
 
@@ -131,6 +132,11 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 		}
 
 		LOG.debug("Properties file properties: " + _props.toString());
+		
+		// Set _waitAllocatedSecs bases on property or default
+		_waitAllocatedSecs = StreamsMesosConstants.WAIT_ALLOCATED_SECS_DEFAULT;
+		if (Utils.hasProperty(getProps(), StreamsMesosConstants.PROPS_WAIT_ALLOCATED))
+			_waitAllocatedSecs = Utils.getLongProperty(getProps(), StreamsMesosConstants.PROPS_WAIT_ALLOCATED);
 
 	}
 
@@ -530,6 +536,7 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 			throw new StreamsMesosException(_scheduler.getLastErrorMessage());
 		}
 		LOG.info("Mesos Framework scheduler started: " + fwInfo.getName());
+		_state.setScheduler(_scheduler);
 	}
 
 
@@ -638,6 +645,7 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 					") does not match ZK_CONNECT registered for this resource manager (" + 
 					_argsMap.get(StreamsMesosConstants.ZK_ARG)	 + ")");
 		}
+	
 		
 		for (int i = 0; i < count; i++) {
 			// Creates new Resource, queues, and adds to map of all resources
@@ -676,8 +684,11 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 				LOG.trace("Polling the new requests...");
 				for (StreamsMesosResource smr : newAllocationRequests) {
 					LOG.trace("smr {id: " + smr.getId() + ", state: " + smr.getResourceState().toString() + "}");
-					if (smr.isRunning()) {
-						LOG.debug("Resource " + smr.getId() + " Mesos task is now running, still could fail before we notify Streams");
+					// Ensure it is running and has been for our minimum duration
+					// We use a minimum duration to prevent reporting quick failures as allocated, only to have to turn around
+					// and revoke them.  This is usually only in the case of a slave not configured properly (e.g. Streams not found)
+					if (smr.isRunning() && (smr.getReesourceStateDurationSeconds() > _waitAllocatedSecs)) {
+						LOG.debug("Resource " + smr.getId() + " Mesos task has been running longer than " + _waitAllocatedSecs + ".  Will notify after waiting for all requests.");
 						runningCount++;
 					}
 				}

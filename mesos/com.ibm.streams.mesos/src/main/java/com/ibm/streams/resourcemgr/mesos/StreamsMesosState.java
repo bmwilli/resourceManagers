@@ -48,7 +48,7 @@ public class StreamsMesosState {
 	private static final Logger LOG = LoggerFactory.getLogger(StreamsMesosState.class);
 	
 	private StreamsMesosResourceManager _manager;
-	//private StreamsMesosScheduler _scheduler;
+	private StreamsMesosScheduler _scheduler;
 
 	/* StreamsMesosResource containers */
 
@@ -73,7 +73,7 @@ public class StreamsMesosState {
 	 */
 	public StreamsMesosState(StreamsMesosResourceManager manager) {
 		_manager = manager;
-		//_scheduler = null;
+		_scheduler = null;
 		_allResources = new ConcurrentHashMap<String, StreamsMesosResource>();
 		_requestedResources = new CopyOnWriteArrayList<StreamsMesosResource>();
 		_clientInfo = null;
@@ -81,9 +81,9 @@ public class StreamsMesosState {
 	}
 
 	
-	//public void setScheduler(StreamsMesosScheduler _scheduler) {
-	//	this._scheduler = _scheduler;
-	//}
+	public void setScheduler(StreamsMesosScheduler _scheduler) {
+		this._scheduler = _scheduler;
+	}
 
 	// Create a new SMR and put it proper containers
 	synchronized public StreamsMesosResource createNewResource(ClientInfo client, ResourceTags tags, boolean isMaster, List<Protos.CommandInfo.URI> uriList) throws ResourceManagerException {
@@ -116,7 +116,7 @@ public class StreamsMesosState {
 		LOG.debug("Queuing new Resource Request: " + smr.toString());
 		// These might be the same thing...need to determine this.
 		_allResources.put(smr.getId(), smr);
-		_requestedResources.add(smr);
+		requestResource(smr);
 
 		return smr;
 	}
@@ -129,7 +129,19 @@ public class StreamsMesosState {
 		smr.setResourceState(ResourceState.NEW);
 		smr.setTaskCompletionStatus(null);
 		smr.setTaskId(null);
-		_requestedResources.add(smr);
+		requestResource(smr);
+	}
+	
+	private void requestResource(StreamsMesosResource smr) {
+		synchronized(this) {
+			_requestedResources.add(smr);
+			if (_scheduler != null) {
+				if (!_scheduler.isReceivingOffers()) {
+					LOG.debug("Reviving offers from mesos");
+					_scheduler.reviveOffers();
+				}
+			}
+		}
 	}
 	
 	public Map<String, StreamsMesosResource> getAllResources() {

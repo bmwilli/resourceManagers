@@ -142,6 +142,10 @@ class StreamsMesosResource {
 	private RequestState _requestState = RequestState.NEW;
 	private TaskCompletionStatus _taskCompletionStatus = TaskCompletionStatus.NONE;
 	
+	// Time of last resoureState change.  Allows us to verify task running for a minimum amount of time
+	// Use System.currentTimeMillis() to set
+	private long _resourceStateChangeTime = System.currentTimeMillis();
+	
 	private Set<String> _tags = new HashSet<String>();
 
 	private Map<String, String> _argsMap;
@@ -243,6 +247,11 @@ class StreamsMesosResource {
 	 */
 	public void setResourceState(ResourceState state) {
 		this._resourceState = state;
+		this._resourceStateChangeTime = System.currentTimeMillis();
+	}
+	
+	public long getReesourceStateDurationSeconds() {
+		return ((System.currentTimeMillis() - this._resourceStateChangeTime) / 1000);
 	}
 	
 	

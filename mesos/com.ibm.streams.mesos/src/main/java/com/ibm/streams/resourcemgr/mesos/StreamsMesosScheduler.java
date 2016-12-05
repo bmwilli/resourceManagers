@@ -52,6 +52,7 @@ public class StreamsMesosScheduler implements Scheduler {
 	StreamsMesosState _state;
 	SchedulerDriver _schedulerDriver = null;
 	String _lastErrorMessage = null;
+	boolean _receivingOffers = true;
 
 	/**
 	 * @param streamsRM
@@ -68,6 +69,18 @@ public class StreamsMesosScheduler implements Scheduler {
 		return _lastErrorMessage;
 	}
 
+
+
+
+	public boolean isReceivingOffers() {
+		return _receivingOffers;
+	}
+
+
+
+	public void setReceivingOffers(boolean _receivingOffers) {
+		this._receivingOffers = _receivingOffers;
+	}
 
 
 
@@ -173,6 +186,7 @@ public class StreamsMesosScheduler implements Scheduler {
 		//LOG.trace("***** OFFERS *****");
 		//LOG.trace(offers.toString());
 
+
 		// Loop through offers, and exhaust the offer with resources we can
 		// satisfy
 		for (Protos.Offer offer : offers) {
@@ -241,6 +255,15 @@ public class StreamsMesosScheduler implements Scheduler {
 			}
 		} // end for each offer
 		LOG.trace("Finished handilng offers");
+		
+		// Check if there are any resource requests.  If not, supressOffers
+		synchronized(_state) {
+			if (_state.getRequestedResources().isEmpty()) {
+				LOG.debug("There are no more requested resources, supress offers");
+				supressOffers();
+			}
+		}
+		
 	}
 
 	private void launchTask(SchedulerDriver schedulerDriver, Protos.Offer offer, Protos.TaskInfo task) {
@@ -283,6 +306,23 @@ public class StreamsMesosScheduler implements Scheduler {
 		
 		_state.taskStatusUpdate(taskStatus);
 
+	}
+	
+	// Tell Mesos we do not want offers (until we revive them)
+	// No reason to keep getting offers until we have a resource request
+	public void supressOffers() {
+		LOG.debug("Calling _schedulerDriver.supressOffers()");
+		Protos.Status status = _schedulerDriver.suppressOffers();
+		setReceivingOffers(false);
+		LOG.debug("supressOffers returned driver status: " + status.toString());
+	}
+	
+	// Tell Mesos we we want to start receiving offers
+	public void reviveOffers() {
+		LOG.debug("Calling _schedulerDriver.reviveOffers()");
+		Protos.Status status = _schedulerDriver.reviveOffers();
+		setReceivingOffers(true);
+		LOG.debug("reviveOffers returned driver status: " + status.toString());
 	}
 
 }

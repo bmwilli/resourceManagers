@@ -36,16 +36,10 @@ streamtool addresourcespec --numresources 1,ingest[exclusive]
 * Using mesos CommandExecutor
   - It may report running while command is still running streamsresourcesetup.sh and controller is not yet started
   - Only way to get around this may be to implement our own executor that does not report running until it is
-  - Work around: Like YARN resource manager set domain.serviceStartTimeout=300
+  - Work around: Like YARN resource manager set controller.startTimeout=300
 
 ## To Do (Working notes to get version 0.1.0 ready)
-* Change to using controller.startTimeout to wait
-	* Retry failure situation (mv /opt/ibm to /opt/ibmxxx on slaves)
-		* Is it any faster to fail
-	* Retry deploy situation...does it wait long enough for it to come up?
 	
-* Check application.log in sandbox for java not found error
-
 * Suspend offers when no resources waiting
 
 * Handle type as an argument even down to resource display name naming
@@ -72,7 +66,8 @@ streamtool addresourcespec --numresources 1,ingest[exclusive]
 	* ANSWER Not required since we use containers.  Only required when giving out whole machines
 	* Could come into play if we truly accepted entire offer
 ## Future
-* Supress offers from mesos until there is a resource request
+* Utilize resource requirements in the requests to limit the offers from Mesos to what we need
+	* Cuts down on chatter and offers from Mesos
 * Handle multiple multiple clients (e.g. multiple domains)
 * Ability to run Mesos Resource Manager as root or a user
   * root would allow easier authentication with pam (security.runAsRoot)
@@ -90,8 +85,19 @@ streamtool addresourcespec --numresources 1,ingest[exclusive]
 	* Mesos - Handle Master failover, Reconcile Tasks, Handle Scheduler failover
 	* Streams - Do the same
 * Convert exceptions to ResourceManagerMessageException, did not see the API for that
-* Enhance logging (see Symphony resource manager)
+* Enhance Exceptions to use Locale (see Symphony)
+* Handle rolling upgrade scenarios and starting isntances at different versions.  Streams version is part of request for resources.  Generate multiple versions of resource packages to send out
 
+
+## Features / Issues Handled
+* Implemented WAIT_ALLOCATED_SECS default of 2 to wait for a task to be running for that long before notifying streams
+	* This prevents notification of allocated and then revoking resource if it fails quickly
+	* this is the kind of failure that occurs if you have pre-installed streams, however, one of the slaves is not valid
+	  and the start of the controller fails.  The mesos task reports running for a brief amount of time then reports failed
+	* By waiting for it to be running for 2 seconds if it fails within that time, we simply try again when a new offer 
+	  is available.  In testing it could take many, many attempts, but it usually finally gets an offer from a good slave
+* Supress Mesos Offers when there are no outstanding resource requests
+	* Only when we have a resource request that needs resources do we tell Mesos to send us offers
 
 
 

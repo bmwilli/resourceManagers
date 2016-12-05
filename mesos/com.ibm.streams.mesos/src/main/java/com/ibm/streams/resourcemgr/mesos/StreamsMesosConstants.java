@@ -87,8 +87,14 @@ public class StreamsMesosConstants {
 		PROPS_WAIT_ASYNC = "WAIT_ASYNC_SECS",
 		PROPS_WAIT_FLEXIBLE="WAIT_FLEXIBLE_SECS",
 		PROPS_WAIT_HEARTBEAT="WAIT_HEARTBEAT_SECS",
+		PROPS_WAIT_ALLOCATED="WAIT_ALLOCATED_SECS",
 		PROPS_MESOS_FETCH_PARENT_URI="MESOS_FETCH_PARENT_URI"
 	;
+	
+	public static final long
+		WAIT_ALLOCATED_SECS_DEFAULT=2
+	;
+	
 	/* Mesos resource allocation defaults */
 	public static final double
 		RM_MEMORY_DEFAULT = 2048,

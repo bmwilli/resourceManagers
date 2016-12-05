@@ -147,7 +147,9 @@ public class Utils {
 	public static double getDoubleProperty(Properties p, String name)  {
 		return Double.parseDouble(getProperty(p, name).trim());
 	}
-
+	public static long getLongProperty(Properties p, String name)  {
+		return Long.parseLong(getProperty(p, name).trim());
+	}
 	static Map<String, AtomicLong> idMap = new HashMap<String, AtomicLong>();
 	public static String generateNextId (String name) {
 		synchronized(idMap) {
