@@ -105,19 +105,46 @@ There are a few messages that are produced by the zookeeper C++ client of mesos.
 A solution to suppressing these messages is still being searched...do you have an answer?
 
 
-# A few commands:
+# Commands:
 
-## mkdomain command
-streamtool mkdomain --property domain.externalResourceManager=mesos
+## Create Domain
+`streamtool mkdomain --property domain.externalResourceManager=mesos`
 
-## start mesos manager 
-./streams-on-mesos start --master zk://172.31.29.41:2181/mesos
+## Start Mesos Resource Manager (pre-installed Streams)
+`./streams-on-mesos start --master zk://172.31.29.41:2181/mesos`
 
-## Get status of Mesos Resource Manager
-./streams-on-mesos status -d StreamsDomain
+## Status of Mesos Resource Manager Process
+`./streams-on-mesos status -d StreamsDomain`
+<pre>
+Host                                         Port   PID    Status   Version
+ip-172-31-29-41.ec2.internal (172.31.29.41)  33202  30715  RUNNING  4.2.0.0
+</pre>
 
+## Start the Domain
+`streamtool startdomain`
 
-## Dependencies
+## Make Instance
+`streamtool mkinstance --numresources 1`
+
+## Start Instance
+`streamtool startinstance`
+
+## Add Resource Spec to Instance
+`streamtool addresourcespec --numresources 1`
+
+## State of Mesos Resource Manager
+`./streams-on-mesos getresourcestate`
+<pre>
+Display Name      Native Name  Mesos Task ID         Resource State  Request State  Completion Status  Host Name      Is Master  
+mesos\_resource\_0  resource\_0   streams\_resource\_0\_2  RUNNING         ALLOCATED      NONE               172.31.29.41   true       
+mesos\_resource\_2  resource\_2   streams\_resource\_2\_0  RUNNING         ALLOCATED      NONE               172.31.25.121  false      
+mesos\_resource\_1  resource\_1   streams\_resource\_1\_0  RUNNING         ALLOCATED      NONE               172.31.39.232  false
+</pre>
+
+## Stop Mesos Resource Manager
+`./streams-on-mesos stop`
+
+# Dependencies
 * Apache Maven
     * To check whether Maven is installed on your system, enter which mvn.
     * To download Maven, go to the [Apache Maven website](https://maven.apache.org/).
