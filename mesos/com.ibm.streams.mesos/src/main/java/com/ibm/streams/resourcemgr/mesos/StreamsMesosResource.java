@@ -26,7 +26,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Map;
-
+import java.util.Properties;
 import java.util.Set;
 
 import org.apache.mesos.Protos;
@@ -148,7 +148,7 @@ class StreamsMesosResource {
 	
 	private Set<String> _tags = new HashSet<String>();
 
-	private Map<String, String> _argsMap;
+	private Properties _config;
 	private List<Protos.CommandInfo.URI> _uriList;
 
 	// Resource utilization related members
@@ -161,22 +161,22 @@ class StreamsMesosResource {
 	private String _taskId = null;
 	private String _hostName = null;
 	
-	
+	private String _resourceType = null;
 	
 	//public StreamsMesosResource(String id, ClientInfo client, String domainId, String zk, int priority, Map<String, String> argsMap,
-	public StreamsMesosResource(String id, ClientInfo client, StreamsMesosResourceManager manager, Map<String, String> argsMap,
+	public StreamsMesosResource(String id, ClientInfo client, StreamsMesosResourceManager manager, Properties config,
 			List<Protos.CommandInfo.URI> uriList) {
 		this._resourceId = id;
-		this._streamsDisplayName = StreamsMesosConstants.RESOURCE_TYPE + "_" + id;
+		this._resourceType = Utils.getProperty(config, StreamsMesosConstants.PROPS_RESOURCE_TYPE);
+		this._streamsDisplayName =  this._resourceType + "_" + id;
 		this._client = client;
 		this._manager = manager;
 		this._domainId = client.getDomainId();
 		this._zkConnect = client.getZkConnect();
 		//this.priority = priority;
-		this._argsMap = argsMap;
+		this._config = config;
 		this._uriList = uriList;
-		if (argsMap.containsKey(StreamsMesosConstants.HOME_DIR_ARG))
-			_homeDir = argsMap.get(StreamsMesosConstants.HOME_DIR_ARG);
+		this._homeDir = Utils.getProperty(config, StreamsMesosConstants.PROPS_USER_HOME);
 	}
 
 	public String getId() {
@@ -310,7 +310,7 @@ class StreamsMesosResource {
 	
 	
 	public ResourceDescriptor getDescriptor() {
-		return new ResourceDescriptor(StreamsMesosConstants.RESOURCE_TYPE, ResourceKind.CONTAINER, _resourceId,
+		return new ResourceDescriptor(_resourceType, ResourceKind.CONTAINER, _resourceId,
 				_streamsDisplayName, _hostName);
 
 	}
@@ -340,7 +340,7 @@ class StreamsMesosResource {
 			//cmdBuffer.append(";export HOME=${MESOS_SANDBOX}");
 			cmdBuffer.append("; export HOME=" + getHomeDir());
 
-		if (_argsMap.containsKey(StreamsMesosConstants.DEPLOY_ARG)) {
+		if (Utils.getBooleanProperty(_config, StreamsMesosConstants.PROPS_DEPLOY)) {
 			// run the streams resource installer
 			// create softlink for StreamsLink
 			cmdBuffer.append(";./StreamsResourceInstall/streamsresourcesetup.sh");
@@ -351,7 +351,7 @@ class StreamsMesosResource {
 		} else {
 			// if --deploy not set, we assume streams is installed on all
 			// machines
-			String streamsInstall = _argsMap.get(StreamsMesosConstants.INSTALL_PATH_ARG);
+			String streamsInstall = Utils.getProperty(_config, StreamsMesosConstants.STREAMS_INSTALL_PATH_ARG);
 			cmdBuffer.append(";ln -s " + streamsInstall + " StreamsLink");
 		}
 		// Source streams install path

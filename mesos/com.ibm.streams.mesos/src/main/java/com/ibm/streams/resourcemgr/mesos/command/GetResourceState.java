@@ -40,10 +40,10 @@ public class GetResourceState {
 		try {
 			// Connect to the Resource Manager
 			if (domain != null) {
-				client = ClientConnectionFactory.createConnection("GetResourceStateCommand", StreamsMesosConstants.RESOURCE_TYPE, zkConnect, domain);
+				client = ClientConnectionFactory.createConnection("GetResourceStateCommand", StreamsMesosConstants.RESOURCE_TYPE_DEFAULT, zkConnect, domain);
 			}
 			else {
-				client = ClientConnectionFactory.createConnection("GetResourceStateCommand",  StreamsMesosConstants.RESOURCE_TYPE, zkConnect);
+				client = ClientConnectionFactory.createConnection("GetResourceStateCommand",  StreamsMesosConstants.RESOURCE_TYPE_DEFAULT, zkConnect);
 			}
 			client.connect();
 		} catch (ResourceException e) {

@@ -41,7 +41,7 @@ streamtool addresourcespec --numresources 1,ingest[exclusive]
 ## To Do (Working notes to get version 0.1.0 ready)
 	
 * Suspend offers when no resources waiting
-
+* Custom command needs to accept resourceType as an argument, using default for now
 * Handle type as an argument even down to resource display name naming
 	
 * Handle error condition when framework killed but zookeeper thinks domain is running

@@ -168,9 +168,10 @@ If you ever need to stop an inactive framework in mesos:
 
 
 
-## Limitations
+## Current Limitations
 ### Streams Resource Manager Related
 * Only handles a single Controller Client (single domain)
+* Only handles a single version of Streams
 * ...
 
 ### Mesos Related

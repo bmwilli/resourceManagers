@@ -88,20 +88,15 @@ public class StreamsMesosState {
 	// Create a new SMR and put it proper containers
 	synchronized public StreamsMesosResource createNewResource(ClientInfo client, ResourceTags tags, boolean isMaster, List<Protos.CommandInfo.URI> uriList) throws ResourceManagerException {
 		// Create the Resource object (default state is NEW)
-		StreamsMesosResource smr = new StreamsMesosResource(Utils.generateNextId("resource"), client, _manager, _manager.getArgsMap(),
+		StreamsMesosResource smr = new StreamsMesosResource(Utils.generateNextId("resource"), client, _manager, _manager.getConfig(),
 				uriList);
 
 		smr.setMaster(isMaster);
 		
 		// Set resource needs (Need to integrate with tags soon)
-		double memory = StreamsMesosConstants.RM_MEMORY_DEFAULT;
-		double cores = StreamsMesosConstants.RM_CORES_DEFAULT;
+		double memory = Utils.getDoubleProperty(_manager.getConfig(), StreamsMesosConstants.PROPS_DC_MEMORY);
+		double cores = Utils.getDoubleProperty(_manager.getConfig(), StreamsMesosConstants.PROPS_DC_CORES);
 
-		if (Utils.hasProperty(_manager.getProps(), StreamsMesosConstants.PROPS_DC_MEMORY))
-			memory = Utils.getDoubleProperty(_manager.getProps(), StreamsMesosConstants.PROPS_DC_MEMORY);
-
-		if (Utils.hasProperty(_manager.getProps(), StreamsMesosConstants.PROPS_DC_CORES))
-			cores = Utils.getDoubleProperty(_manager.getProps(), StreamsMesosConstants.PROPS_DC_CORES);
 		smr.setMemory(memory);
 		smr.setCpu(cores);
 
