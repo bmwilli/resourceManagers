@@ -141,6 +141,8 @@ public class StreamsMesosConstants {
 	public static final String
 		CUSTOM_COMMAND="command",
 		CUSTOM_COMMAND_GET_RESOURCE_STATE="getresourcestate",
+		CUSTOM_ARG_LONG="-l",
+		CUSTOM_PARM_LONG="long",
 		CUSTOM_RESULT_RESOURCES="resources",
 		CUSTOM_RESULT_RESOURCE_ID="nativeId",
 		CUSTOM_RESULT_RESOURCE_STREAMS_ID="id",
@@ -150,6 +152,7 @@ public class StreamsMesosConstants {
 		CUSTOM_RESULT_RESOURCE_COMPLETION_STATUS="taskCompletionStatus",
 		CUSTOM_RESULT_RESOURCE_HOST_NAME="hostname",
 		CUSTOM_RESULT_RESOURCE_IS_MASTER="master",
+		CUSTOM_RESULT_RESOURCE_TAGS="tags",
 		
 		CUSTOM_COMMAND_RETURN_CODE="rc"
 	;

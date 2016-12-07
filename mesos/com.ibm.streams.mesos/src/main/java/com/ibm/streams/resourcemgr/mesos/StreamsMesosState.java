@@ -314,7 +314,7 @@ public class StreamsMesosState {
 				
 				// RUNNING
 				if (newResourceState == ResourceState.RUNNING && requestState == RequestState.NEW) {
-					LOG.debug("Resource " + smr.getId() + " is now RUNNING and RequestState was NEW, no action required allocateResources will notice its running and set requestStatus to ALLOCATED");
+					LOG.debug("Resource " + smr.getId() + " is now RUNNING and RequestState was NEW, no action required");
 					//Allocated within time so no need to notify client
 					// Let the StreamsMesosResourceManager wait loop set it to allocated when it sees it RUNNING
 					//smr.setRequestState(RequestState.ALLOCATED);
@@ -323,6 +323,9 @@ public class StreamsMesosState {
 					// Need to notify client
 					smr.setRequestState(RequestState.ALLOCATED);
 					smr.notifyClientAllocated();
+				} else if (newResourceState == ResourceState.RUNNING && oldResourceState == ResourceState.STOPPING) {
+					LOG.debug("Resource " + smr.getId() + " is now RUNNING, but it was STOPPING.  Issuing stop again.");
+					smr.stop();
 					
 				// STOPPED and FAILED - may need to better test to determine normal expected from unexpected
 					

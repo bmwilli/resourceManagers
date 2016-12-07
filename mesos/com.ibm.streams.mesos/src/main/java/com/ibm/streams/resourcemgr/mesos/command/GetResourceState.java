@@ -18,6 +18,8 @@ public class GetResourceState {
 	static public void main(String[] args) {
 		String zkConnect = null;
 		String domain = null;
+		String resourceType = StreamsMesosConstants.RESOURCE_TYPE_DEFAULT;
+		boolean longVersion = false;
 		for (int index = 0; index < args.length; ++index) {
 			String arg = args[index];
 			if (arg.equals(StreamsMesosConstants.ZK_ARG) && index + 1 < args.length) {
@@ -25,6 +27,12 @@ public class GetResourceState {
 			}
 			else if (arg.equals(StreamsMesosConstants.DOMAIN_ID_ARG) && index + 1 < args.length) {
 				domain = args[++index];
+			}
+			else if (arg.equals(StreamsMesosConstants.TYPE_ARG) && index + 1 < args.length) {
+				resourceType = args[++index];
+			}
+			else if (arg.equals(StreamsMesosConstants.CUSTOM_ARG_LONG)) {
+				longVersion = true;
 			}
 		}
 		
@@ -40,10 +48,10 @@ public class GetResourceState {
 		try {
 			// Connect to the Resource Manager
 			if (domain != null) {
-				client = ClientConnectionFactory.createConnection("GetResourceStateCommand", StreamsMesosConstants.RESOURCE_TYPE_DEFAULT, zkConnect, domain);
+				client = ClientConnectionFactory.createConnection("GetResourceStateCommand", resourceType, zkConnect, domain);
 			}
 			else {
-				client = ClientConnectionFactory.createConnection("GetResourceStateCommand",  StreamsMesosConstants.RESOURCE_TYPE_DEFAULT, zkConnect);
+				client = ClientConnectionFactory.createConnection("GetResourceStateCommand",  resourceType, zkConnect);
 			}
 			client.connect();
 		} catch (ResourceException e) {
@@ -58,6 +66,7 @@ public class GetResourceState {
 			// Create the command json
 			JSONObject data = new JSONObject();
 			data.put(StreamsMesosConstants.CUSTOM_COMMAND, StreamsMesosConstants.CUSTOM_COMMAND_GET_RESOURCE_STATE);
+			data.put(StreamsMesosConstants.CUSTOM_PARM_LONG, String.valueOf(longVersion));
 			
 			// Call the command on the client
 			String response = client.customCommand(data.toString(), Locale.getDefault());
@@ -68,12 +77,17 @@ public class GetResourceState {
 			JSONArray resources = (JSONArray)responseObj.get(StreamsMesosConstants.CUSTOM_RESULT_RESOURCES);
 			
 			// Create output table headings
-			String colHeadings[] = {"Display Name", "Native Name", "Mesos Task ID", "Resource State", "Request State", "Completion Status", "Host Name", "Is Master"};
-
+			String colHeadingsBase[] = {"Display Name", "Native Name", "Mesos Task ID", "Resource State", "Request State", "Completion Status", "Host Name", "Is Master"};
+			String colHeadingsLong[] = {"Tags"};
+			List<String> colNameList = new ArrayList<String>();
+			colNameList.addAll(Arrays.asList(colHeadingsBase));
+			if (longVersion)
+				colNameList.addAll(Arrays.asList(colHeadingsLong));
+			
 			// Get the table body
 			List<String[]> tableBody = new ArrayList<String[]>();
 			for (Object obj : resources.toArray()) {
-				String row[] = new String[colHeadings.length];
+				String row[] = new String[colNameList.size()];
 				JSONObject resource = (JSONObject)obj;
 				row[0] = resource.get(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_STREAMS_ID).toString();
 				row[1] = resource.get(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_ID).toString();
@@ -83,18 +97,21 @@ public class GetResourceState {
 				row[5] = resource.get(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_COMPLETION_STATUS).toString();
 				row[6] = resource.get(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_HOST_NAME).toString();
 				row[7] = resource.get(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_IS_MASTER).toString();
+				if (longVersion) {
+					row[8] = resource.get(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_TAGS).toString();
+				}
 				tableBody.add(row);
 			}
 			
 			// Get width of headings 
-			int colWidths[] = new int[colHeadings.length];
-			for (int i = 0; i < colHeadings.length; i++) {
-				colWidths[i] = colHeadings[i].length();
+			int colWidths[] = new int[colNameList.size()];
+			for (int i = 0; i < colNameList.size(); i++) {
+				colWidths[i] = colNameList.get(i).length();
 			}
 			
 			// Get max widths including body with 
 			for (String[] row : tableBody) {
-				for (int i = 0; i < colHeadings.length; i++) {
+				for (int i = 0; i < colNameList.size(); i++) {
 					colWidths[i] = Math.max(colWidths[i], row[i].length());
 				}
 			}
@@ -102,16 +119,25 @@ public class GetResourceState {
 			// Create output format string
 			int colGap = 2;
 			StringBuffer fmt = new StringBuffer();
-			for (int i = 0; i < colHeadings.length; i++) {
+			for (int i = 0; i < colNameList.size(); i++) {
 				fmt.append("%-" + String.valueOf(colWidths[i] + colGap) + "s");
 			}
 			fmt.append("\n");
 			
 			// Output the Table
-			System.out.format(fmt.toString(), colHeadings[0], colHeadings[1], colHeadings[2], colHeadings[3], colHeadings[4], colHeadings[5], colHeadings[6], colHeadings[7]);
-			
+			if (!longVersion) {
+				System.out.format(fmt.toString(), colNameList.get(0), colNameList.get(1), colNameList.get(2), colNameList.get(3), colNameList.get(4), colNameList.get(5), colNameList.get(6), colNameList.get(7));
+			} else {
+				System.out.format(fmt.toString(), colNameList.get(0), colNameList.get(1), colNameList.get(2), colNameList.get(3), colNameList.get(4), colNameList.get(5), colNameList.get(6), colNameList.get(7), colNameList.get(8));
+
+			}
 			for (String[] row: tableBody) {
-				System.out.format(fmt.toString(), row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7]);
+				if (!longVersion) {
+					System.out.format(fmt.toString(), row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7]);
+				} else {
+					System.out.format(fmt.toString(), row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7], row[8]);
+	
+				}
 			}
 			
 		

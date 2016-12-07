@@ -42,11 +42,16 @@ COMMANDS = {
 			),
 	"status": Command("status",  "Displays status of the Streams Resource Manager Process.",
 			"\t[--zkconnect {<host>:<port>},...]\n"
-			+ "\t[-d,--domain-id <optional: domain identifier> | --all]\n" 
+			+ "\t[-d,--domain-id <optional: domain identifier> | --all]" 
 			),
 	"getresourcestate": Command("getresourcestate", "Displays state of all resources and associated mesos tasks (displays old resources at this time also)",
 			"\t[--zkconnect {<host:<port>},...]\n"
-			+ "\t [-d, --domain-id <optional: domain identifier> | --all]\n"
+			+ "\t[-d, --domain-id <optional: domain identifier> | --all]\n"
+			+ "\t[-l:]\n"
+			+ "\n" 
+			+ "\tOptions and Arguments\n"
+			+ "\t -l:\n"
+			+ "\t\tDisplay long version of output including tags"
 			)
 	}
 
@@ -54,8 +59,9 @@ def print_help(msg):
 	print "Usage: streams-on-mesos command <options>"
 	print "COMMAND\tOPTIONS"
 	for command in COMMANDS:
-		print command  + "  " + COMMANDS[command]._descr
+		print command  + ":  " + COMMANDS[command]._descr
 		print COMMANDS[command]._str
+		print
 	print ""
 	sys.exit(msg)
 
@@ -80,7 +86,7 @@ try:
 	elif(sys.argv[1] == "status"):
 		options, remainder = getopt.getopt(sys.argv[2:], "d:", ["zkconnect=", "domain-id=", "type=", "all"])
 	elif(sys.argv[1] == "getresourcestate"):
-		options, remainder = getopt.getopt(sys.argv[2:], "d:", ["zkconnect=", "domain-id=", "type=", "all"])
+		options, remainder = getopt.getopt(sys.argv[2:], "d:l", ["zkconnect=", "domain-id=", "type=", "all"])
 	else :
 		print_help("Unknown command: " + sys.argv[1])
 		sys.exit()
@@ -92,7 +98,8 @@ except getopt.GetoptError as err:
 domain_env=getenv("STREAMS_DOMAIN_ID")
 
 # Need to determine how this is used from containers
-user_home=getenv("HOME")
+# BRIAN: Comment out for now and make property
+#user_home=getenv("HOME")
 
 
 # determine where to find properties file and .jar if not specified
@@ -123,6 +130,7 @@ domain=domain_env
 wasDomainSet=False
 force=False
 wasAllSet=False
+wasLongSet=False
 
 for opt, arg in options:
 	if opt == "--zkconnect":
@@ -146,6 +154,8 @@ for opt, arg in options:
 		wasTypeSet = True
 	elif opt == "--all":
 		wasAllSet = True
+	elif opt == "-l":
+		wasLongSet = True
 	else:
 		sys.exit("Invalid option: " + opt)
 
@@ -192,14 +202,12 @@ if (usesHadoop):
 
 
 if(sys.argv[1] == "start"):
-	print "streams_install = ", streams_install
-
 	command=(java_command
 		 + " -cp " + java_cp
 		 + " com.ibm.streams.resourcemgr.ResourceServer "
 		 + " ".join(sys.argv[1:])
 		 + " --manager " + streams_mesos_manager_class + " "
-		 + " --home-dir " + user_home
+		# + " --home-dir " + user_home
 		 + " --install-path " + streams_install
 		 )
 	if not wasDomainSet:
@@ -263,12 +271,15 @@ elif(sys.argv[1] == "status"):
 elif(sys.argv[1] == "getresourcestate"):
 	command = (java_command
 		+ " -cp " + java_cp
-		+ " com.ibm.streams.resourcemgr.mesos.command.GetResourceState"
+		+ " com.ibm.streams.resourcemgr.mesos.command.GetResourceState "
+		+ " ".join(sys.argv[2:])
 		)
 	if not wasAllSet:
 		command = command+ " --domain-id " + domain
 	if not wasZkSet:
 		command = command + " --zkconnect " + zk
+	if not wasTypeSet:
+		command = command + " --type " + type
 	rc = system(command)
 	if(rc != 0):
 		sys.exit(1)

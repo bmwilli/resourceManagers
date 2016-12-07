@@ -37,21 +37,20 @@ streamtool addresourcespec --numresources 1,ingest[exclusive]
   - It may report running while command is still running streamsresourcesetup.sh and controller is not yet started
   - Only way to get around this may be to implement our own executor that does not report running until it is
   - Work around: Like YARN resource manager set controller.startTimeout=300
+* Streams system/impl/bin/startDomainController.sh has a which java before running dependency checker
+  - On compute nodes without their own java, this reports error and does not run dependency checker
+  - Need to report to IBM
+  - Minor becuase later in the script it runs the domain controller using Streams internal java install
+  
+  
 
 ## To Do (Working notes to get version 0.1.0 ready)
-	
-* Suspend offers when no resources waiting
-* Custom command needs to accept resourceType as an argument, using default for now
-* Handle type as an argument even down to resource display name naming
-	
+		
 * Handle error condition when framework killed but zookeeper thinks domain is running
   * streamtool stopdomain --force will try and release resource...handle gracefully
-* Where is proper place to create descriptor?
-  - Move it to the State
-* Revisit arguments and properties
 * Initial version of --deploy (done)
-  * Will come back to this after getting stuff to work
-* Validate Stop
+  * Need test on HDFS
+* Validate Stop???
   * Prevent shutdown (unless --force) if we have resources being used
 
 ## Development issues:
@@ -61,10 +60,7 @@ streamtool addresourcespec --numresources 1,ingest[exclusive]
 	* For now do both and look for inconsistencies
 	* Future move to just cilentID and remove domainId as a required argument
 
-## Development Questions:
-* sampleRM had a lot of logic about re-using resources that are already beeing used but were not excluded by the new allocateResources request.  Should we implement that?  When would you do that?  Would we do that in the case that we configured the resource manager to take entire offers?
-	* ANSWER Not required since we use containers.  Only required when giving out whole machines
-	* Could come into play if we truly accepted entire offer
+
 ## Future
 * Utilize resource requirements in the requests to limit the offers from Mesos to what we need
 	* Cuts down on chatter and offers from Mesos
@@ -73,11 +69,9 @@ streamtool addresourcespec --numresources 1,ingest[exclusive]
   * root would allow easier authentication with pam (security.runAsRoot)
   * user would limit to single user if pam authentication used
 * Instructions and test for PKI authentication
-* Resource packing when offers have more resources that needed (see Building applications on mesos book)
 * If cpu and mem set to -1, then use entire offer for a resource...done..not sure we really want to do this, so DONT
 * Marathon submission of framework
   * run streams-on-mesos from marathon
-* Streams Resource Manager custom commands to get internal state of allResources list, etc.
 * Web interface to get internal state
 * Persistent State manager - see Symphony Resource Manager
 	* ValidateState
@@ -87,7 +81,8 @@ streamtool addresourcespec --numresources 1,ingest[exclusive]
 * Convert exceptions to ResourceManagerMessageException, did not see the API for that
 * Enhance Exceptions to use Locale (see Symphony)
 * Handle rolling upgrade scenarios and starting isntances at different versions.  Streams version is part of request for resources.  Generate multiple versions of resource packages to send out
-
+* Resource packing when offers have more resources that needed (see Building applications on mesos book)
+  * Do not recommend doing this becuase will overload a single host perhaps
 
 ## Features / Issues Handled
 * Implemented WAIT_ALLOCATED_SECS default of 2 to wait for a task to be running for that long before notifying streams
@@ -98,6 +93,7 @@ streamtool addresourcespec --numresources 1,ingest[exclusive]
 	  is available.  In testing it could take many, many attempts, but it usually finally gets an offer from a good slave
 * Supress Mesos Offers when there are no outstanding resource requests
 	* Only when we have a resource request that needs resources do we tell Mesos to send us offers
+* Streams Resource Manager custom commands to get internal state of allResources list, etc.
 
 
 
@@ -168,3 +164,9 @@ I have not tested these instructions yet
 	-e "MESOS_WORK_DIR=/var/lib/mesos" \
 	-d \
 	garland/mesosphere-docker-mesos-master
+	
+	
+## Development Questions:
+* sampleRM had a lot of logic about re-using resources that are already beeing used but were not excluded by the new allocateResources request.  Should we implement that?  When would you do that?  Would we do that in the case that we configured the resource manager to take entire offers?
+	* ANSWER Not required since we use containers.  Only required when giving out whole machines
+	* Could come into play if we truly accepted entire offer

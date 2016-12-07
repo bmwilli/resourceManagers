@@ -69,9 +69,6 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 
 	private StreamsMesosState _state;
 	
-	//private Map<String, String> _envs = System.getenv();
-	//private Map<String, String> _argsMap = new HashMap<String, String>();
-	//private Properties _props = null;
 	private Properties _config = null;
 
 	private StreamsMesosScheduler _scheduler;
@@ -100,14 +97,13 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 		Map<String, String> argsMap = new HashMap<String, String>();
 		Properties props = null;
 		
-		LOG.debug("Arguments: " + Arrays.toString(args));
-		LOG.debug("Enironment: " + envs);
+		LOG.trace("Arguments: " + Arrays.toString(args));
+		LOG.trace("Enironment: " + envs);
 
 		argsMap.clear();
 		for (int i = 0; i < args.length; i++) {
 			switch (args[i]) {
 			case StreamsMesosConstants.DEPLOY_ARG:
-				_deployStreams = true;
 				argsMap.put(args[i], "true");
 				break;
 			case StreamsMesosConstants.MESOS_MASTER_ARG:
@@ -122,7 +118,7 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 				break;
 			}
 		}
-		LOG.debug("ArgsMap: " + argsMap);
+		LOG.trace("ArgsMap: " + argsMap);
 
 		String propsFile = null;
 		// Process Properties FileReader
@@ -142,13 +138,18 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 			throw new StreamsMesosException("IO Error reading the properties file: " + propsFile, e);
 		}
 
-		LOG.debug("Properties file properties: " + props.toString());
+		LOG.trace("Properties: " + props.toString());
 		
 		// Use precedence of default->environs->props->arguments to build _config
 		initializeConfig(envs, argsMap, props);
 		
+		LOG.debug("**************************************");
+		LOG.debug("Configuration: " + _config.toString());
+		LOG.debug("**************************************");
+		
 		// Set _waitAllocatedSecs 
 		_waitAllocatedSecs = Utils.getLongProperty(_config, StreamsMesosConstants.PROPS_WAIT_ALLOCATED);
+		_deployStreams = Utils.getBooleanProperty(_config, StreamsMesosConstants.PROPS_DEPLOY);
 
 	}
 
@@ -158,34 +159,6 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 	public StreamsMesosState getState() {
 		return _state;
 	}
-
-	/**
-	 * @return the argsMap
-	 */
-	//public Map<String, String> getArgsMap() {
-	//	return _argsMap;
-	//}
-
-	/**
-	 * @param argsMap the argsMap to set
-	 */
-	//public void setArgsMap(Map<String, String> argsMap) {
-	//	this._argsMap = argsMap;
-	//}
-
-	/**
-	 * @return the props
-	 */
-	//public Properties getProps() {
-	//	return _props;
-	//}
-
-	/**
-	 * @param props the props to set
-	 */
-	//public void setProps(Properties props) {
-	//	this._props = props;
-	//}
 	
 	/**
 	 * @return the props
@@ -210,7 +183,7 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 		setConfigPropertyWithEnv(StreamsMesosConstants.PROPS_ZK_CONNECT, props,
 				StreamsMesosConstants.ENV_STREAMS_ZKCONNECT,
 				StreamsMesosConstants.ZK_ARG, argsMap);
-		if (propValue == null) {
+		if (propValue == null || propValue.equals("")) {
 			throw new ResourceManagerException("Zookeeper not set.  Check env, props, arguments");
 		}
 		
@@ -236,6 +209,9 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 		propValue = setConfigPropertyWithEnv(StreamsMesosConstants.PROPS_USER_HOME, props,
 				StreamsMesosConstants.ENV_HOME_DIR,
 				StreamsMesosConstants.HOME_DIR_ARG, argsMap);
+		if (propValue == null || propValue.equals("")) {
+			throw new ResourceManagerException("HOME_DIR for Mesos Tasks not set.  Usually set to ${MESOS_SANDBOX}");
+		}
 		
 		// Streams Domain Id
 		propValue = setConfigPropertyWithEnv(StreamsMesosConstants.PROPS_STREAMS_DOMAIN_ID, props,
@@ -275,7 +251,7 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 				String.valueOf(StreamsMesosConstants.WAIT_ALLOCATED_SECS_DEFAULT));
 		
 		// Provisioning work directory: Location where we have Streams build resource package for deployments
-		setConfigProperty(StreamsMesosConstants.PROPS_MESOS_FETCH_PARENT_URI, props,
+		setConfigProperty(StreamsMesosConstants.PROPS_PROVISIONING_WORKDIR_PREFIX, props,
 				String.valueOf(StreamsMesosConstants.PROVISIONING_WORKDIR_PREFIX_DEFAULT));
 		
 		// Fetch Parent URI: Location where Mesos fetcher will look for URI's we make available
@@ -981,9 +957,11 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 	public void getResourceState(JSONObject request, JSONObject response, ClientInfo client) {
 		JSONArray resources = new JSONArray();
 		
+		boolean longVersion = Boolean.parseBoolean((String)request.get(StreamsMesosConstants.CUSTOM_PARM_LONG));
+		
 		Map<String,StreamsMesosResource> allResources = _state.getAllResources();
 		for (StreamsMesosResource smr : allResources.values()) {
-			resources.add(smr.toJsonObject());
+			resources.add(smr.toJsonObject(longVersion));
 		}
 		
 		response.put(StreamsMesosConstants.CUSTOM_RESULT_RESOURCES, resources);

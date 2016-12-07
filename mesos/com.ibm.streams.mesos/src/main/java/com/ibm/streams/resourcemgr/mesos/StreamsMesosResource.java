@@ -351,7 +351,7 @@ class StreamsMesosResource {
 		} else {
 			// if --deploy not set, we assume streams is installed on all
 			// machines
-			String streamsInstall = Utils.getProperty(_config, StreamsMesosConstants.STREAMS_INSTALL_PATH_ARG);
+			String streamsInstall = Utils.getProperty(_config, StreamsMesosConstants.PROPS_STREAMS_INSTALL_PATH);
 			cmdBuffer.append(";ln -s " + streamsInstall + " StreamsLink");
 		}
 		// Source streams install path
@@ -439,7 +439,7 @@ class StreamsMesosResource {
 		
 		switch(_resourceState) {
 		case NEW:
-		case STOPPING:
+		//case STOPPING:
 		case STOPPED:
 		case FAILED:
 			return; // nothing to do
@@ -502,7 +502,7 @@ class StreamsMesosResource {
 				"]";
 	}
 	
-	public JSONObject toJsonObject() {
+	public JSONObject toJsonObject(boolean longVersion) {
 		JSONObject resource = new JSONObject();
 		resource.put(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_ID, getId());
 		resource.put(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_STREAMS_ID, _streamsDisplayName);
@@ -512,6 +512,10 @@ class StreamsMesosResource {
 		resource.put(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_COMPLETION_STATUS, _taskCompletionStatus.toString());
 		resource.put(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_HOST_NAME, _hostName);
 		resource.put(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_IS_MASTER, _isMaster);
+		
+		if (longVersion) {
+			resource.put(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_TAGS, _tags.toString());
+		}
 
 		return resource;
 	}
