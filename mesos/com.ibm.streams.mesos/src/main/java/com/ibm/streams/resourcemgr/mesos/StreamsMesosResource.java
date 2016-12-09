@@ -515,6 +515,8 @@ class StreamsMesosResource {
 		
 		if (longVersion) {
 			resource.put(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_TAGS, _tags.toString());
+			resource.put(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_CORES, String.valueOf(_cpu));
+			resource.put(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_MEMORY, String.valueOf(_memory));
 		}
 
 		return resource;

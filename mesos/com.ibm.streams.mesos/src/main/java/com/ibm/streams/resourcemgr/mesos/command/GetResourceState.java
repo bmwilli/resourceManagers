@@ -78,7 +78,7 @@ public class GetResourceState {
 			
 			// Create output table headings
 			String colHeadingsBase[] = {"Display Name", "Native Name", "Mesos Task ID", "Resource State", "Request State", "Completion Status", "Host Name", "Is Master"};
-			String colHeadingsLong[] = {"Tags"};
+			String colHeadingsLong[] = {"Tags","Cores","Memory"};
 			List<String> colNameList = new ArrayList<String>();
 			colNameList.addAll(Arrays.asList(colHeadingsBase));
 			if (longVersion)
@@ -99,6 +99,9 @@ public class GetResourceState {
 				row[7] = resource.get(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_IS_MASTER).toString();
 				if (longVersion) {
 					row[8] = resource.get(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_TAGS).toString();
+					row[9] = resource.get(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_CORES).toString();
+					row[10] = resource.get(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_MEMORY).toString();
+
 				}
 				tableBody.add(row);
 			}
@@ -128,14 +131,14 @@ public class GetResourceState {
 			if (!longVersion) {
 				System.out.format(fmt.toString(), colNameList.get(0), colNameList.get(1), colNameList.get(2), colNameList.get(3), colNameList.get(4), colNameList.get(5), colNameList.get(6), colNameList.get(7));
 			} else {
-				System.out.format(fmt.toString(), colNameList.get(0), colNameList.get(1), colNameList.get(2), colNameList.get(3), colNameList.get(4), colNameList.get(5), colNameList.get(6), colNameList.get(7), colNameList.get(8));
+				System.out.format(fmt.toString(), colNameList.get(0), colNameList.get(1), colNameList.get(2), colNameList.get(3), colNameList.get(4), colNameList.get(5), colNameList.get(6), colNameList.get(7), colNameList.get(8), colNameList.get(9), colNameList.get(10));
 
 			}
 			for (String[] row: tableBody) {
 				if (!longVersion) {
 					System.out.format(fmt.toString(), row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7]);
 				} else {
-					System.out.format(fmt.toString(), row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7], row[8]);
+					System.out.format(fmt.toString(), row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7], row[8], row[9], row[10]);
 	
 				}
 			}
