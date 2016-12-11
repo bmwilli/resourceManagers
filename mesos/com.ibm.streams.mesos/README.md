@@ -141,6 +141,15 @@ mesos_resource_2  resource_2   streams_resource_2_0  RUNNING         ALLOCATED  
 mesos_resource_1  resource_1   streams_resource_1_0  RUNNING         ALLOCATED      NONE               172.31.39.232  false
 </pre>
 
+`./streams-on-mesos getresourcestate -l`
+<pre>
+Display Name      Native Name  Mesos Task ID         Resource State  Request State  Completion Status  Host Name      Is Master  Tags                               Cores  Memory
+mesos_resource_0  resource_0   streams_resource_0_0  RUNNING         ALLOCATED      NONE               172.31.25.121  true       [jmx, audit, sws, authentication]  2.0    4096.0
+mesos_resource_2  resource_2   streams_resource_2_0  RUNNING         ALLOCATED      NONE               172.31.39.232  false      [application]                      2.0    4096.0
+mesos_resource_1  resource_1   streams_resource_1_0  RUNNING         ALLOCATED      NONE               172.31.29.41   false      [view, management]                 2.0    4096.0
+
+</pre>
+
 ## Stop Mesos Resource Manager
 `./streams-on-mesos stop`
 
