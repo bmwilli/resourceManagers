@@ -183,6 +183,44 @@ Create a tag that will accept any size offer, however utilizes the entire offer 
 `streamtool addresourcespec --numresources 1,mesos_medium`
 
 
+# Deploy Via Marathon (Under Construction)
+Marathon is a Mesos framework for long-running applications
+
+The Marathon .json file here is just an example.  While under development the properties file deployed in the .tar.gz may not be acceptable for any environment other than the current development environment being used by the author.
+
+## Create and save a Marathon configuration
+<pre>
+{
+	"id": "/streams-on-mesos-curl",
+	"instances": 1,
+	"cpus": 1,
+	"mem": 132,
+	"cmd": "$(pwd)/streamsmesos/scripts/streams-on-mesos start",
+	"args": null,
+	"user": null,
+	"env": {
+		"STREAMS_INSTALL": "/opt/ibm/InfoSphere_Streams/4.2.0.0",
+		"STREAMS_ZKCONNECT": "172.31.29.41:2181",
+		"STREAMS_DOMAIN_ID": "StreamsDomain"
+	},
+	"uris": [
+		"/home/brian/git/resourceManagers/mesos/com.ibm.streams.mesos/target/streams-on-mesos-0.0.1-SNAPSHOT.tar.gz"
+	],
+	"constraints": [
+		[
+			"hostname",
+			"LIKE",
+			"172.31.29.41"
+		]
+	]
+}
+</pre>
+
+## Deploy on Marathon
+<pre>
+curl -s XPOST http://localhost:8080/v2/apps -d@marathon.json -H "Content-Type: application/json"
+</pre>
+
 # Dependencies
 * Apache Maven
     * To check whether Maven is installed on your system, enter which mvn.
