@@ -97,10 +97,10 @@ These can be controlled using environment variables:
 ### Zookeeper Client C++ Messages
 There are a few messages that are produced by the zookeeper C++ client of mesos.  Examples:
 <pre>
-    2016-12-01 21:14:48,162:13288(0x7f7e3c293700):ZOO\_INFO@log\_env@726: Client environment:zookeeper.version=zookeeper C client 3.4.8
-    2016-12-01 21:14:48,162:13288(0x7f7e3c293700):ZOO\_INFO@log\_env@730: Client environment:host.name=ip-172-31-29-41.ec2.internal
-    2016-12-01 21:14:48,162:13288(0x7f7e3c293700):ZOO\_INFO@log\_env@737: Client environment:os.name=Linux
-    2016-12-01 21:14:48,162:13288(0x7f7e3c293700):ZOO\_INFO@log\_env@738: Client environment:os.arch=3.10.0-327.36.3.el7.x86_64
+    2016-12-01 21:14:48,162:13288(0x7f7e3c293700):ZOO_INFO@log_env@726: Client environment:zookeeper.version=zookeeper C client 3.4.8
+    2016-12-01 21:14:48,162:13288(0x7f7e3c293700):ZOO_INFO@log_env@730: Client environment:host.name=ip-172-31-29-41.ec2.internal
+    2016-12-01 21:14:48,162:13288(0x7f7e3c293700):ZOO_INFO@log_env@737: Client environment:os.name=Linux
+    2016-12-01 21:14:48,162:13288(0x7f7e3c293700):ZOO_INFO@log_env@738: Client environment:os.arch=3.10.0-327.36.3.el7.x86_64
 </pre>
 A solution to suppressing these messages is still being searched...do you have an answer?
 
@@ -136,9 +136,18 @@ ip-172-31-29-41.ec2.internal (172.31.29.41)  33202  30715  RUNNING  4.2.0.0
 `./streams-on-mesos getresourcestate`
 <pre>
 Display Name      Native Name  Mesos Task ID         Resource State  Request State  Completion Status  Host Name      Is Master  
-mesos\_resource\_0  resource\_0   streams\_resource\_0\_2  RUNNING         ALLOCATED      NONE               172.31.29.41   true       
-mesos\_resource\_2  resource\_2   streams\_resource\_2\_0  RUNNING         ALLOCATED      NONE               172.31.25.121  false      
-mesos\_resource\_1  resource\_1   streams\_resource\_1\_0  RUNNING         ALLOCATED      NONE               172.31.39.232  false
+mesos_resource_0  resource_0   streams_resource_0_2  RUNNING         ALLOCATED      NONE               172.31.29.41   true       
+mesos_resource_2  resource_2   streams_resource_2_0  RUNNING         ALLOCATED      NONE               172.31.25.121  false      
+mesos_resource_1  resource_1   streams_resource_1_0  RUNNING         ALLOCATED      NONE               172.31.39.232  false
+</pre>
+
+`./streams-on-mesos getresourcestate -l`
+<pre>
+Display Name      Native Name  Mesos Task ID         Resource State  Request State  Completion Status  Host Name      Is Master  Tags                               Cores  Memory
+mesos_resource_0  resource_0   streams_resource_0_0  RUNNING         ALLOCATED      NONE               172.31.25.121  true       [jmx, audit, sws, authentication]  2.0    4096.0
+mesos_resource_2  resource_2   streams_resource_2_0  RUNNING         ALLOCATED      NONE               172.31.39.232  false      [application]                      2.0    4096.0
+mesos_resource_1  resource_1   streams_resource_1_0  RUNNING         ALLOCATED      NONE               172.31.29.41   false      [view, management]                 2.0    4096.0
+
 </pre>
 
 ## Stop Mesos Resource Manager
