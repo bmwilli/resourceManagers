@@ -151,9 +151,13 @@ class StreamsMesosResource {
 	private Properties _config;
 	private List<Protos.CommandInfo.URI> _uriList;
 
-	// Resource utilization related members
+	// Resource Request utilization related members
 	private double _memory = -1;
 	private double _cpu = -1;
+	
+	// Resource Task utilization related members
+	private double _memoryAllocated = -1;
+	private double _cpuAllocated = -1;
 
 	private boolean _isMaster = false;
 
@@ -379,8 +383,10 @@ class StreamsMesosResource {
 	 */
 	public Protos.TaskInfo buildStreamsMesosResourceTask(Protos.Offer offer) {
 
-		double task_cpus = getCpu();
-		double task_memory = getMemory();
+		double requestedCpu = getCpu();
+		double requestedMemory = getMemory();
+		
+		LOG.trace("building Mesos Task: cores = " + requestedCpu + ", memory=" + requestedMemory);
 
 		// Create taskId
 		Protos.TaskID taskIdProto = generateTaskId(getId());
@@ -389,27 +395,31 @@ class StreamsMesosResource {
 		setHostName(offer.getHostname());
 
 		// Calculate resources usage if configured to use it all
-		if ((task_cpus == StreamsMesosConstants.USE_ALL_CORES)
-				|| (task_memory == StreamsMesosConstants.USE_ALL_MEMORY)) {
+		if ((requestedCpu == StreamsMesosConstants.USE_ALL_CORES)
+				|| (requestedMemory == StreamsMesosConstants.USE_ALL_MEMORY)) {
 			for (Resource r : offer.getResourcesList()) {
-				if ((r.getName().equals("cpus")) && (task_cpus == StreamsMesosConstants.USE_ALL_CORES)) {
-					task_cpus = r.getScalar().getValue();
-					LOG.debug("SMR Task (" + getId() + ") using all cpus in offer: " + String.valueOf(task_cpus));
+				if ((r.getName().equals("cpus")) && (requestedCpu == StreamsMesosConstants.USE_ALL_CORES)) {
+					requestedCpu = r.getScalar().getValue();
+					LOG.debug("SMR Task (" + getId() + ") using all cpus in offer: " + String.valueOf(requestedCpu));
 				}
-				if ((r.getName().equals("mem")) && (task_memory == StreamsMesosConstants.USE_ALL_MEMORY)) {
-					task_memory = r.getScalar().getValue();
-					LOG.debug("SMR Task (" + getId() + ") using all memory in offer: " + String.valueOf(task_memory));
+				if ((r.getName().equals("mem")) && (requestedMemory == StreamsMesosConstants.USE_ALL_MEMORY)) {
+					requestedMemory = r.getScalar().getValue();
+					LOG.debug("SMR Task (" + getId() + ") using all memory in offer: " + String.valueOf(requestedMemory));
 				}
 			}
 		}
+		
+		// Set what we are going to allocate
+		_cpuAllocated = requestedCpu;
+		_memoryAllocated = requestedMemory;
 
 		// Get the commandInfo from the Streams Mesos Resource
 		Protos.CommandInfo commandInfo = buildStreamsResourceStartupCommand();
 
 		// Work on getting this fillout out correctly
 		Protos.TaskInfo task = Protos.TaskInfo.newBuilder().setName(getId()).setTaskId(taskIdProto)
-				.setSlaveId(offer.getSlaveId()).addResources(buildResource("cpus", task_cpus))
-				.addResources(buildResource("mem", task_memory))
+				.setSlaveId(offer.getSlaveId()).addResources(buildResource("cpus", requestedCpu))
+				.addResources(buildResource("mem", requestedMemory))
 				// .setData(ByteString.copyFromUtf8("" + taskIdCounter))
 				.setCommand(Protos.CommandInfo.newBuilder(commandInfo)).build();
 
@@ -492,8 +502,10 @@ class StreamsMesosResource {
 				", requestState=" + _requestState +
 				", domainId=" + _domainId + 
 				", zkConnect=" + _zkConnect + 
-				", memory=" + _memory + 
-				", cpu=" + _cpu + 
+				", memoryRequested=" + _memory + 
+				", memoryAllocated=" + _memoryAllocated +
+				", cpuRequested=" + _cpu + 
+				", cpuAllocated=" + _cpuAllocated +
 				", isMaster=" + _isMaster + 
 				", tags=" + _tags + 
 				", taskId=" + _taskId + 
@@ -515,8 +527,8 @@ class StreamsMesosResource {
 		
 		if (longVersion) {
 			resource.put(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_TAGS, _tags.toString());
-			resource.put(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_CORES, String.valueOf(_cpu));
-			resource.put(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_MEMORY, String.valueOf(_memory));
+			resource.put(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_CORES, String.valueOf(_cpuAllocated));
+			resource.put(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_MEMORY, String.valueOf(_memoryAllocated));
 		}
 
 		return resource;

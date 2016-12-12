@@ -93,14 +93,14 @@ public class StreamsMesosState {
 
 		smr.setMaster(isMaster);
 		
-		// Set resource needs (Need to integrate with tags soon)
+		// Set default resource needs
 		double memory = Utils.getDoubleProperty(_manager.getConfig(), StreamsMesosConstants.PROPS_DC_MEMORY);
 		double cores = Utils.getDoubleProperty(_manager.getConfig(), StreamsMesosConstants.PROPS_DC_CORES);
 
 		smr.setMemory(memory);
 		smr.setCpu(cores);
 
-		// Set the resource tags
+		// Set the resource tags which may override defaults for memory and cores
 		if (tags != null) {
 			_manager.convertTags(tags, smr); // may set mem/cpu from the tags if they are specified
 			smr.getTags().addAll(tags.getNames());

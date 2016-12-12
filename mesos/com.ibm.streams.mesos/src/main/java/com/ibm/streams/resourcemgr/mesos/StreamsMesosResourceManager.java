@@ -410,7 +410,7 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 	@Override
     public void validateTags(ClientInfo client, ResourceTags tags, Locale locale) throws ResourceTagException,
             ResourceManagerException {
-		LOG.trace("StreamsResourceServer called validateTags()");
+		LOG.trace("StreamsResourceServer called validateTags() with: " + tags.toString());
         for (String tag : tags.getNames()) {
             TagDefinitionType definitionType = tags.getTagDefinitionType(tag);
             switch (definitionType) {
@@ -651,7 +651,7 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 
 	
 	///////////////////////////////////////////////
-	/// PRIVATE METHODS
+	/// Resource and Tag METHODS
 	///////////////////////////////////////////////
 	
 	/** 
@@ -661,8 +661,8 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 	 * @throws ResourceManagerException
 	 */
 	public void convertTags(ResourceTags tags, StreamsMesosResource smr) throws ResourceTagException, ResourceManagerException {
-		int cores = -1;
-		int memory = -1;
+		double cores = -1;
+		double memory = -1;
 		
 		for (String tag : tags.getNames()) {
 			try {
@@ -676,11 +676,13 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 					Properties propsDef = tags.getDefinitionAsProperties(tag);
 					LOG.trace("Tag=" + tag + " props=" + propsDef.toString());
 					if (propsDef.containsKey(StreamsMesosConstants.MEMORY_TAG)) {
-						memory = Math.max(memory,  Utils.getIntProperty(propsDef, StreamsMesosConstants.MEMORY_TAG));
+						//memory = Math.max(memory,  Utils.getIntProperty(propsDef, StreamsMesosConstants.MEMORY_TAG));
+						memory = Utils.getDoubleProperty(propsDef, StreamsMesosConstants.MEMORY_TAG);
 						LOG.trace("Tag=" + tag + " memory=" + memory);
 					}
 					if (propsDef.containsKey(StreamsMesosConstants.CORES_TAG)) {
-						cores = Math.max(cores,  Utils.getIntProperty(propsDef, StreamsMesosConstants.CORES_TAG));
+						//cores = Math.max(cores,  Utils.getDoubleProperty(propsDef, StreamsMesosConstants.CORES_TAG));
+						cores = Utils.getDoubleProperty(propsDef, StreamsMesosConstants.CORES_TAG);
 						LOG.trace("Tag=" + tag + " cores=" + cores);
 					}
 					break;
@@ -703,21 +705,31 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 	
     private void validateTagAttribute(String tag, String key, Object valueObj) throws ResourceTagException {
         //memory, cores
+    	// Value of 0 means use all resources
+    	double value;
+    	
         if (key.equals(StreamsMesosConstants.MEMORY_TAG) || key.equals(StreamsMesosConstants.CORES_TAG)) {
             if (valueObj == null) {
-                 throw new ResourceTagException("Tag: " + tag + " memory property must not be empty if it is present.");
+                 throw new ResourceTagException("Tag: " + tag + " property: " + key + " must not be empty if it is present.");
             } else if (valueObj instanceof String) {
                 try {
-                    Integer.parseInt(valueObj.toString().trim());
+                    value = Double.parseDouble(valueObj.toString().trim());
                 } catch (NumberFormatException nfe) {
-                    throw new ResourceTagException("Tag: " + tag + " memory property must contain a numeric value.");
+                    throw new ResourceTagException("Tag: " + tag + " property: " + key + " must contain a numeric value.");
                 }
-            } else if (!(valueObj instanceof Long) && !(valueObj instanceof Integer)) {
-                throw new ResourceTagException("Tag: " + tag + " memory property must contain a numeric value.");
+            } else if (!(valueObj instanceof Double) && !(valueObj instanceof Integer)) {
+                throw new ResourceTagException("Tag: " + tag + " property: " + key + " must contain a numeric value.");
+            } else {
+            	value = (double)valueObj;
             }
         } else {
-            throw new ResourceTagException("Tag: " + tag + " contains an unsupported attribute");
+            throw new ResourceTagException("Tag: " + tag + " contains an unsupported attribute: " + key);
         }
+        
+        if (value < 0.0) {
+        	throw new ResourceTagException("Tag: " + tag + " property: " + key + " must be have a value >= 0");
+        }
+        
     }
     
 	/*

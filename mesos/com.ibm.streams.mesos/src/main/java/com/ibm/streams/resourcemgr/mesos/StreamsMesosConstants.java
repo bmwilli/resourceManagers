@@ -111,8 +111,8 @@ public class StreamsMesosConstants {
 
 	/* Constants for specifying to use all resources in an offer */
 	public static final double
-		USE_ALL_CORES = -1,
-		USE_ALL_MEMORY = -1
+		USE_ALL_CORES = 0,
+		USE_ALL_MEMORY = 0
 	;
 
 	/* Streams tag names */

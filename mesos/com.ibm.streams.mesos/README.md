@@ -153,6 +153,36 @@ mesos_resource_1  resource_1   streams_resource_1_0  RUNNING         ALLOCATED  
 ## Stop Mesos Resource Manager
 `./streams-on-mesos stop`
 
+# Resource Tags
+The Streams Mesos Resource Manager supports two tag properties to control resource allocation sizes:
+
+| Tag Property | Format | Default | Description |
+| ------------ | ------ | ------- | ----------- |
+| cores       | double | 2.0 | Number (or fractional part) of CPU Cores to allocate (0 = entire offer) |
+| memory | double | 4096 | Amount of RAM (Megabytes) to allocate ( 0 = entire offer) |
+
+>Note: The resource allocated for the Master Domain Controller uses the defaults
+
+>WARNING: Creating a resource tag with cores or memory set to 0 will use the entire offer from Mesos.  This is not recommended, but can be useful for reserving entire hosts (minus what has already been allocated) for streams.
+
+## Create a tag
+Create a tag that requests 1 core and 1GB of memory:<br>
+`streamtool mktag --description "Small 1 core and 1GB memory" --property cores=1 --property memory=1024 mesos_small`
+
+Create a tag that requests 2 core and 2GB of memory:<br>
+`streamtool mktag --description "Medium 2 core and 2GB memory" --property cores=2 --property memory=2048 mesos_medium`
+
+Create a tag that will accept any size offer, however utilizes the entire offer **(USE WITH CAUTION)**:<br>
+`streamtool mktag --description "Any size offer and use it all" --property cores=0 --property memory=0 mesos_all`
+
+
+## Make the Instance 
+`streamtool mkinstance --numresources 1,mesos_small`
+
+## Add resources to an Instance
+`streamtool addresourcespec --numresources 1,mesos_medium`
+
+
 # Dependencies
 * Apache Maven
     * To check whether Maven is installed on your system, enter which mvn.
