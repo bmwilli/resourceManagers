@@ -1,0 +1,29 @@
+{
+	"id": "/streams-on-mesos",
+	"instances": 1,
+	"cpus": 1,
+	"mem": 128,
+	"cmd": "$(pwd)/streamsmesos/scripts/streams-on-mesos start",
+	"args": null,
+	"user": null,
+	"env": {
+		"STREAMS_INSTALL": "/opt/ibm/InfoSphere_Streams/4.2.0.0",
+		"STREAMS_ZKCONNECT": "172.31.29.41:2181",
+		"STREAMS_DOMAIN_ID": "StreamsDomain"
+	},
+	"fetch": [
+		{
+			"uri": "/home/brian/git/resourceManagers/mesos/com.ibm.streams.mesos/target/streams-on-mesos-0.0.1-SNAPSHOT.tar.gz"
+			"extract": true,
+			"executable": false,
+			"cache": false
+		}
+	],
+	"constraints": [
+		[
+			"hostname",
+			"LIKE",
+			"172.31.29.41"
+		]
+	]
+}

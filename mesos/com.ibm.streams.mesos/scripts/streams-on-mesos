@@ -14,7 +14,6 @@ import commands
 
 #true if this is part of Streams
 is_prod_switch=False
-marathon_switch=True
 
 streams_mesos_manager_class = "com.ibm.streams.resourcemgr.mesos.StreamsMesosResourceManager"
 streams_mesos_jar_basename="streams-on-mesos-0.0.1-SNAPSHOT-jar-with-dependencies.jar"
@@ -110,13 +109,9 @@ properties = None
 if (is_prod_switch):
 	streams_mesos_jar=streams_install+"/lib/"+streams_mesos_jar_basename
 	properties=streams_install+"/etc/mesos/streams-mesos.properties"
-elif (marathon_switch):
-	proj_path="./streamsmesos/"
-	streams_mesos_jar=proj_path + "lib/"+streams_mesos_jar_basename
-	properties=proj_path+"etc/streams-mesos.properties"
 else:
 	proj_path=(dirname(realpath(__file__))) + "/../"
-	streams_mesos_jar=proj_path + "target/" + streams_mesos_jar_basename
+	streams_mesos_jar=proj_path + "lib/" + streams_mesos_jar_basename
 	properties=proj_path+"etc/streams-mesos.properties"
 
 user = getenv("USER")
