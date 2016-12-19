@@ -12,14 +12,6 @@
 * if it happens quicly we can retry and thus avoid telling Streams we have allocated the resource
 
 
-## mkdomain command
-streamtool mkdomain --property domain.externalResourceManager=mesos
-
-## start mesos manager 
-./streams-on-mesos start --master zk://172.31.29.41:2181/mesos
-
-## Get status of Mesos Resource Manager
-./streams-on-mesos status -d StreamsDomain
 
 ## Resource Specification Commands
 ### Show resource specifications
@@ -65,11 +57,7 @@ streamtool addresourcespec --numresources 1,ingest[exclusive]
 * Utilize resource requirements in the requests to limit the offers from Mesos to what we need
 	* Cuts down on chatter and offers from Mesos
 * Handle multiple multiple clients (e.g. multiple domains)
-* Ability to run Mesos Resource Manager as root or a user
-  * root would allow easier authentication with pam (security.runAsRoot)
-  * user would limit to single user if pam authentication used
 * Instructions and test for PKI authentication
-* If cpu and mem set to -1, then use entire offer for a resource...done..not sure we really want to do this, so DONT
 * Marathon submission of framework
   * run streams-on-mesos from marathon
 * Web interface to get internal state

@@ -67,42 +67,23 @@ If you choose not use the `--deploy` option, the Streams software should be inst
 Note: At this time, the location on the mesos slaves must be the same as on the node where `streams-on-mesos` command is run.
 This will made into a property or argument in a future version.
 
+## Run as user or run as root
+The user that each Streams Controller runs as within the Mesos task is controlled by the property:
+>`MESOS_USER`
 
-# LOGGING
-## Java Messages
-Most error messages can be controlled by using a log4j.properties file.  streams-on-mesos adds "." to the classpath so you can create a log4j.properties file where you execute the command from
+This value defaults to the user who executes the streams-on-mesos command (and thus the StreamsResourceServer).
+## Run as root
+If you are going to set the domain property `security.runAsRoot=true` then you need to set the MESOS_USER to root:
+>`MESOS_USER=root`
 
-A default log4j.properties is included in the .jar file for this package and can be found here:
+## streams-on-mesos in Marathon
+If you run streams-on-mesos via marathon, you control the user that runs it via the marathon json file used to submit it.
+A null value defaults to the user that runs the Marathon framework (which is often root)
+>`"user":null`
 
-> src/main/resource/log4j.properties
+If this is the case, the default user for the streams-on-mesos controller tasks will be root
 
-## C++ Messages
-The Mesos Java API uses JNI internally and the underlying C/C++ logs messages to stderr
-
-To prevent these messages from coming to the console (with different format than the log4j console appender you have configured) direct the stderr output of the streams-on-mesos command to a file: `streams-on-mesos start ... 2>stderr.out`
-
-### Mesos Java API C++ Messages
-The Mesos Java API that this project was built with uses JNI internally and the underlying C/C++ has logging messages.
-Examples:
-<pre>
-    I1201 20:55:13.422004 12343 sched.cpp:330] New master detected at master@172.31.29.41:5050
-    I1201 20:55:13.422276 12343 sched.cpp:341] No credentials provided. Attempting to register without authentication
-    I1201 20:55:13.423632 12343 sched.cpp:743] Framework registered with a55e4e3f-a439-460e-80d6-d77d0ad66694-0024
-</pre>
-These can be controlled using environment variables:
->	`export MESOS_QUIET=1 // Removes them all`
-
->	`export MESOS_LOGGING_LEVEL=[ERROR,WARNING,INFO] // Sets the specific level`
-	
-### Zookeeper Client C++ Messages
-There are a few messages that are produced by the zookeeper C++ client of mesos.  Examples:
-<pre>
-    2016-12-01 21:14:48,162:13288(0x7f7e3c293700):ZOO_INFO@log_env@726: Client environment:zookeeper.version=zookeeper C client 3.4.8
-    2016-12-01 21:14:48,162:13288(0x7f7e3c293700):ZOO_INFO@log_env@730: Client environment:host.name=ip-172-31-29-41.ec2.internal
-    2016-12-01 21:14:48,162:13288(0x7f7e3c293700):ZOO_INFO@log_env@737: Client environment:os.name=Linux
-    2016-12-01 21:14:48,162:13288(0x7f7e3c293700):ZOO_INFO@log_env@738: Client environment:os.arch=3.10.0-327.36.3.el7.x86_64
-</pre>
-A solution to suppressing these messages is still being searched...do you have an answer?
+>Bottom line: control the users of the streams-on-mesos task and the subsequent controller tasks carefully
 
 
 # Commands:
@@ -243,16 +224,54 @@ If you ever need to stop an inactive framework in mesos:
 
 	curl -XPOST http://localhost:5050/master/teardown -d 'frameworkId=2fabdf51-36b0-4951-9138-719f56ba1ae7-0000'
 
+# LOGGING
+The Streams Mesos Resource manager uses log4j via slf4j.  There is a default log4j.properties file built into the .jar file.
+The sections below discuss exceptions to the logging controlled by the log4j.properties file.
+ 
+## Java Messages
+Most error messages can be controlled by using a log4j.properties file.  streams-on-mesos adds "." to the classpath so you can create a log4j.properties file where you execute the command from
+
+A default log4j.properties is included in the .jar file for this package and can be found here:
+
+> src/main/resource/log4j.properties
+
+## C++ Messages
+The Mesos Java API uses JNI internally and the underlying C/C++ logs messages to stderr
+
+To prevent these messages from coming to the console (with different format than the log4j console appender you have configured) direct the stderr output of the streams-on-mesos command to a file: `streams-on-mesos start ... 2>stderr.out`
+
+### Mesos Java API C++ Messages
+The Mesos Java API that this project was built with uses JNI internally and the underlying C/C++ has logging messages.
+Examples:
+<pre>
+    I1201 20:55:13.422004 12343 sched.cpp:330] New master detected at master@172.31.29.41:5050
+    I1201 20:55:13.422276 12343 sched.cpp:341] No credentials provided. Attempting to register without authentication
+    I1201 20:55:13.423632 12343 sched.cpp:743] Framework registered with a55e4e3f-a439-460e-80d6-d77d0ad66694-0024
+</pre>
+These can be controlled using environment variables:
+>	`export MESOS_QUIET=1 // Removes them all`
+
+>	`export MESOS_LOGGING_LEVEL=[ERROR,WARNING,INFO] // Sets the specific level`
+	
+### Zookeeper Client C++ Messages
+There are a few messages that are produced by the zookeeper C++ client of mesos.  Examples:
+<pre>
+    2016-12-01 21:14:48,162:13288(0x7f7e3c293700):ZOO_INFO@log_env@726: Client environment:zookeeper.version=zookeeper C client 3.4.8
+    2016-12-01 21:14:48,162:13288(0x7f7e3c293700):ZOO_INFO@log_env@730: Client environment:host.name=ip-172-31-29-41.ec2.internal
+    2016-12-01 21:14:48,162:13288(0x7f7e3c293700):ZOO_INFO@log_env@737: Client environment:os.name=Linux
+    2016-12-01 21:14:48,162:13288(0x7f7e3c293700):ZOO_INFO@log_env@738: Client environment:os.arch=3.10.0-327.36.3.el7.x86_64
+</pre>
+A solution to suppressing these messages is still being searched...do you have an answer?
 
 
-## Current Limitations
-### Streams Resource Manager Related
+# Current Limitations
+## Streams Resource Manager Related
 * Only handles a single Controller Client (single domain)
 * Only handles a single version of Streams
 * ...
 
-### Mesos Related
+## Mesos Related
 * Only supports command_executor, no docker_executor support yet
 * ...
 
-## MORE TO COME ...
+# MORE TO COME ...
