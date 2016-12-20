@@ -51,6 +51,7 @@ import com.ibm.streams.resourcemgr.ClientInfo;
 import com.ibm.streams.resourcemgr.ResourceDescriptor;
 import com.ibm.streams.resourcemgr.ResourceDescriptorState;
 import com.ibm.streams.resourcemgr.ResourceException;
+import com.ibm.streams.resourcemgr.ResourceManager.Feature;
 import com.ibm.streams.resourcemgr.ResourceManagerAdapter;
 import com.ibm.streams.resourcemgr.ResourceManagerException;
 import com.ibm.streams.resourcemgr.ResourceManagerUtilities;
@@ -330,6 +331,26 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 			throw new ResourceManagerException(e.toString(), e);
 		}
 		LOG.info("Streams Mesos Resource Manager ready to receive requests from IBM Streams");
+	}
+
+	
+	
+	/* (non-Javadoc)
+	 * @see com.ibm.streams.resourcemgr.ResourceManagerAdapter#isFeatureSupported(com.ibm.streams.resourcemgr.ResourceManager.Feature)
+	 */
+	@Override
+	public boolean isFeatureSupported(Feature feature) {
+		LOG.trace("isFeatureSupported called with feature: " + feature.toString());
+		// handle any features that we do not know about
+		boolean supported = super.isFeatureSupported(feature);
+		
+		// handle the features we do know about
+		switch (feature) {
+		case HIGH_AVAILABILITY:
+			supported = true;
+		}
+		LOG.trace("isFeatureSupported returning: " + supported);
+		return supported;
 	}
 
 	/*
@@ -618,10 +639,19 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 	
 	
 	private FrameworkInfo getFrameworkInfo() {
+		LOG.trace("Creating FrameworkInfo");
 		FrameworkInfo.Builder builder = FrameworkInfo.newBuilder();
-		builder.setFailoverTimeout(120000);
+		builder.setFailoverTimeout(60*60*24*7);  // 1 week
 		builder.setUser(Utils.getProperty(_config, StreamsMesosConstants.PROPS_MESOS_USER));
 		builder.setName(Utils.getProperty(_config, StreamsMesosConstants.PROPS_FRAMEWORK_NAME));
+		// Get framework ID from state in case this is a failover.
+		String savedFrameworkId = _state.getMesosFrameworkId();
+		if (savedFrameworkId != null) {
+			LOG.trace("framworkId found in state.  Must be failover.  ID: " + savedFrameworkId);
+			builder.setId(Protos.FrameworkID.newBuilder().setValue(_state.getMesosFrameworkId()).build());
+		} else {
+			LOG.trace("frameworkId not found in state, must be initial run of leader");
+		}
 		return builder.build();
 	}
 

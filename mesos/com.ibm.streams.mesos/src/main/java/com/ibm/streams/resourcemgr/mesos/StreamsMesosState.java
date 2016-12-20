@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -32,6 +33,7 @@ import org.slf4j.LoggerFactory;
 import com.ibm.streams.resourcemgr.ClientInfo;
 import com.ibm.streams.resourcemgr.ResourceDescriptor;
 import com.ibm.streams.resourcemgr.ResourceManagerException;
+import com.ibm.streams.resourcemgr.ResourcePersistenceManager;
 import com.ibm.streams.resourcemgr.ResourceTags;
 import com.ibm.streams.resourcemgr.mesos.StreamsMesosResource.RequestState;
 import com.ibm.streams.resourcemgr.mesos.StreamsMesosResource.ResourceState;
@@ -49,6 +51,7 @@ public class StreamsMesosState {
 	
 	private StreamsMesosResourceManager _manager;
 	private StreamsMesosScheduler _scheduler;
+	private ResourcePersistenceManager _persistence;
 
 	/* StreamsMesosResource containers */
 
@@ -72,10 +75,14 @@ public class StreamsMesosState {
 	 * Constructor
 	 */
 	public StreamsMesosState(StreamsMesosResourceManager manager) {
+		LOG.trace("StreamsMesosState being constructed");
 		_manager = manager;
 		_scheduler = null;
 		_allResources = new ConcurrentHashMap<String, StreamsMesosResource>();
 		_requestedResources = new CopyOnWriteArrayList<StreamsMesosResource>();
+		LOG.trace("Connecting to Streams ResourcePersistenceManager");
+		_persistence = _manager.getResourcePersistenceManager();
+		_persistence.connect();
 		_clientInfo = null;
 
 	}
@@ -475,6 +482,59 @@ public class StreamsMesosState {
     		LOG.warn("setClientInfo on state failed because it was passed null client object");
     	}
 	    
+    }
+    
+    //////////////////////////////////////////
+    // PERSISTENCE OF STATE
+    //////////////////////////////////////////
+    
+    public String getMesosFrameworkId() {
+    	String frameworkId = null;
+    	Properties props = getPath("mesosFrameworkId");
+    	if (props != null) {
+    		frameworkId = props.getProperty("mesosFrameworkId");
+    	}
+    	return frameworkId;
+    }
+    
+    public void setMesosFrameworkId(String mesosFrameworkId) {
+    	Properties props = new Properties();
+    	props.setProperty("mesosFrameworkId", mesosFrameworkId);
+    	setPath("mesosFrameworkId",props);
+    	
+    }
+    
+    //////////////////////////////////////////
+    /// PERSISTENCE INTERFACES
+    //////////////////////////////////////////
+    
+    /**
+     * Returns properties object from path; null if path does not exist
+     */
+    private Properties getPath(String path) {
+    	Properties props = null;
+    	
+    	try {
+    		if (_persistence.exists(path)) {
+    			byte[] data = _persistence.get(path);
+    			props = _persistence.toProperties(data);
+    		}
+    	} catch (Throwable t) {
+    		LOG.error("Persistence getPath Error: " + t.getMessage());
+    	}
+    	
+    	return props;
+    }
+    
+    /**
+     * Sets persistence path properties (saves into zookeeper)
+     */
+    private void setPath(String path, Properties props) {
+    	try {
+    		_persistence.set(path,  (props != null ? _persistence.toBytes(props) : null));
+    	} catch (Throwable t) {
+    		LOG.error("Persistence setPath Error: " + t.getMessage());
+    	}
     }
 	
 }

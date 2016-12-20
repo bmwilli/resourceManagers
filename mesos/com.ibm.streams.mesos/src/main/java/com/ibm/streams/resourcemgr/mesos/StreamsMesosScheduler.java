@@ -155,6 +155,8 @@ public class StreamsMesosScheduler implements Scheduler {
 	public void registered(SchedulerDriver schedulerDriver, FrameworkID frameworkID, MasterInfo masterInfo) {
 		LOG.info("Mesos Scheduler Registered with the Mesos Master on host: " + masterInfo.getHostname() + ":" + masterInfo.getPort());
 		LOG.debug("  Framwork ID assigned: " + frameworkID);
+		// Set framework ID for failover.  It is idempotent, so no harm in setting it again.
+		_state.setMesosFrameworkId(frameworkID.getValue());
 
 		_schedulerDriver = schedulerDriver;
 		

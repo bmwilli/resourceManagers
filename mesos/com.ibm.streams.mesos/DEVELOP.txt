@@ -52,8 +52,22 @@ streamtool addresourcespec --numresources 1,ingest[exclusive]
 	* For now do both and look for inconsistencies
 	* Future move to just cilentID and remove domainId as a required argument
 
+## Failover and High Availability To Do
+* Handle Scheduler/Framework Failover
+	* Leader Election and Framework ID reuse - DONE
+	* Restore/Validate State
+	* 
+	
+* Handle Mesos Master Failover
+    * Call to reregistered() on the scheduler
+    
 
 ## Future
+* Prevent Shutdown while resources are allocated unless --force used
+* Timout waiting for task status changes
+    * If a task is waiting to be running or terminal state for more than X amount of time
+      then reconcile tasks to see if a message was lost from Mesos
+      If not, then re-execute the task
 * Utilize resource requirements in the requests to limit the offers from Mesos to what we need
 	* Cuts down on chatter and offers from Mesos
 * Handle multiple multiple clients (e.g. multiple domains)
