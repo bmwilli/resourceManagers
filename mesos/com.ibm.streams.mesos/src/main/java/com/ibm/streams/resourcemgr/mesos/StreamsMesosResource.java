@@ -25,15 +25,16 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 
 import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.CommandInfo;
 import org.apache.mesos.Protos.Resource;
-import org.json.simple.JSONObject;
+//import org.json.simple.JSONObject;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.ibm.streams.resourcemgr.ClientInfo;
 import com.ibm.streams.resourcemgr.ResourceDescriptor;
 import com.ibm.streams.resourcemgr.ResourceDescriptor.ResourceKind;
@@ -514,8 +515,29 @@ class StreamsMesosResource {
 				"]";
 	}
 	
-	public JSONObject toJsonObject(boolean longVersion) {
-		JSONObject resource = new JSONObject();
+//	public JSONObject toJsonObject(boolean longVersion) {
+//		JSONObject resource = new JSONObject();
+//		resource.put(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_ID, getId());
+//		resource.put(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_STREAMS_ID, _streamsDisplayName);
+//		resource.put(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_TASK_ID, _taskId);
+//		resource.put(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_RESOURCE_STATE, _resourceState.toString());
+//		resource.put(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_REQUEST_STATE, _requestState.toString());
+//		resource.put(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_COMPLETION_STATUS, _taskCompletionStatus.toString());
+//		resource.put(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_HOST_NAME, _hostName);
+//		resource.put(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_IS_MASTER, _isMaster);
+//		
+//		if (longVersion) {
+//			resource.put(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_TAGS, _tags.toString());
+//			resource.put(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_CORES, String.valueOf(_cpuAllocated));
+//			resource.put(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_MEMORY, String.valueOf(_memoryAllocated));
+//		}
+//
+//		return resource;
+//	}
+	
+	public ObjectNode resourceStateAsJsonObjectNode(boolean longVersion) {
+		ObjectMapper mapper = new ObjectMapper();
+		ObjectNode resource = mapper.createObjectNode();
 		resource.put(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_ID, getId());
 		resource.put(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_STREAMS_ID, _streamsDisplayName);
 		resource.put(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_TASK_ID, _taskId);
@@ -524,13 +546,13 @@ class StreamsMesosResource {
 		resource.put(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_COMPLETION_STATUS, _taskCompletionStatus.toString());
 		resource.put(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_HOST_NAME, _hostName);
 		resource.put(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_IS_MASTER, _isMaster);
-		
+	
 		if (longVersion) {
 			resource.put(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_TAGS, _tags.toString());
 			resource.put(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_CORES, String.valueOf(_cpuAllocated));
 			resource.put(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_MEMORY, String.valueOf(_memoryAllocated));
 		}
-
+	
 		return resource;
 	}
 }

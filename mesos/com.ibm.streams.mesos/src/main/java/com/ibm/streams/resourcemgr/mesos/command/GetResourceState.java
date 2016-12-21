@@ -5,9 +5,14 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 
-import org.json.simple.JSONArray;
-import org.json.simple.JSONObject;
-import org.json.simple.parser.JSONParser;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
+//import org.json.simple.JSONArray;
+//import org.json.simple.JSONObject;
+//import org.json.simple.parser.JSONParser;
 
 import com.ibm.streams.resourcemgr.ClientConnection;
 import com.ibm.streams.resourcemgr.ClientConnectionFactory;
@@ -64,7 +69,9 @@ public class GetResourceState {
 		
 		try {
 			// Create the command json
-			JSONObject data = new JSONObject();
+			ObjectMapper mapper = new ObjectMapper();
+			ObjectNode data = mapper.createObjectNode();
+			
 			data.put(StreamsMesosConstants.CUSTOM_COMMAND, StreamsMesosConstants.CUSTOM_COMMAND_GET_RESOURCE_STATE);
 			data.put(StreamsMesosConstants.CUSTOM_PARM_LONG, String.valueOf(longVersion));
 			
@@ -72,9 +79,8 @@ public class GetResourceState {
 			String response = client.customCommand(data.toString(), Locale.getDefault());
 			
 			// Parse the JSON
-			JSONParser parser = new JSONParser();
-			JSONObject responseObj = (JSONObject) parser.parse(response);
-			JSONArray resources = (JSONArray)responseObj.get(StreamsMesosConstants.CUSTOM_RESULT_RESOURCES);
+			ObjectNode responseObj = (ObjectNode) mapper.readTree(response);
+			ArrayNode resources = (ArrayNode)responseObj.get(StreamsMesosConstants.CUSTOM_RESULT_RESOURCES);
 			
 			// Create output table headings
 			String colHeadingsBase[] = {"Display Name", "Native Name", "Mesos Task ID", "Resource State", "Request State", "Completion Status", "Host Name", "Is Master"};
@@ -86,9 +92,9 @@ public class GetResourceState {
 			
 			// Get the table body
 			List<String[]> tableBody = new ArrayList<String[]>();
-			for (Object obj : resources.toArray()) {
+			for (int i = 0; i < resources.size(); i++) {
+				JsonNode resource = resources.get(i);
 				String row[] = new String[colNameList.size()];
-				JSONObject resource = (JSONObject)obj;
 				row[0] = resource.get(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_STREAMS_ID).toString();
 				row[1] = resource.get(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_ID).toString();
 				row[2] = resource.get(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_TASK_ID).toString();

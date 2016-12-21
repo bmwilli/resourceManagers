@@ -25,16 +25,18 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.apache.mesos.Protos;
-import org.apache.mesos.Protos.SlaveID;
 import org.apache.mesos.Protos.TaskStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.ibm.streams.resourcemgr.ClientInfo;
 import com.ibm.streams.resourcemgr.ResourceDescriptor;
+import com.ibm.streams.resourcemgr.ResourceException;
 import com.ibm.streams.resourcemgr.ResourceManagerException;
 import com.ibm.streams.resourcemgr.ResourcePersistenceManager;
+import com.ibm.streams.resourcemgr.ResourceTagException;
 import com.ibm.streams.resourcemgr.ResourceTags;
+import com.ibm.streams.resourcemgr.ResourceTags.TagDefinitionType;
 import com.ibm.streams.resourcemgr.mesos.StreamsMesosResource.RequestState;
 import com.ibm.streams.resourcemgr.mesos.StreamsMesosResource.ResourceState;
 
@@ -109,7 +111,7 @@ public class StreamsMesosState {
 
 		// Set the resource tags which may override defaults for memory and cores
 		if (tags != null) {
-			_manager.convertTags(tags, smr); // may set mem/cpu from the tags if they are specified
+			convertTags(tags, smr); // may set mem/cpu from the tags if they are specified
 			smr.getTags().addAll(tags.getNames());
 		}
 		
@@ -121,6 +123,55 @@ public class StreamsMesosState {
 		requestResource(smr);
 
 		return smr;
+	}
+	
+	/** 
+	 * @param tags
+	 * @param smr
+	 * @throws ResourceTagException
+	 * @throws ResourceManagerException
+	 */
+	private void convertTags(ResourceTags tags, StreamsMesosResource smr) throws ResourceTagException, ResourceManagerException {
+		double cores = -1;
+		double memory = -1;
+		
+		for (String tag : tags.getNames()) {
+			try {
+				TagDefinitionType definitionType = tags.getTagDefinitionType(tag);
+				
+				switch (definitionType) {
+				case NONE:
+					// use default definition (probably just a name tag (e.g. AUDIT)
+					break;
+				case PROPERTIES:
+					Properties propsDef = tags.getDefinitionAsProperties(tag);
+					LOG.trace("Tag=" + tag + " props=" + propsDef.toString());
+					if (propsDef.containsKey(StreamsMesosConstants.MEMORY_TAG)) {
+						//memory = Math.max(memory,  Utils.getIntProperty(propsDef, StreamsMesosConstants.MEMORY_TAG));
+						memory = Utils.getDoubleProperty(propsDef, StreamsMesosConstants.MEMORY_TAG);
+						LOG.trace("Tag=" + tag + " memory=" + memory);
+					}
+					if (propsDef.containsKey(StreamsMesosConstants.CORES_TAG)) {
+						//cores = Math.max(cores,  Utils.getDoubleProperty(propsDef, StreamsMesosConstants.CORES_TAG));
+						cores = Utils.getDoubleProperty(propsDef, StreamsMesosConstants.CORES_TAG);
+						LOG.trace("Tag=" + tag + " cores=" + cores);
+					}
+					break;
+				default:
+					throw new ResourceTagException("Tag=" + tag + " has unsupported tag definition type=" + definitionType);
+				}
+			} catch (ResourceException rs) {
+				throw new ResourceManagerException(rs);
+			}
+		}
+		
+		// Override memory and cores if they were set by the tags
+		if (memory != -1){
+			smr.setMemory(memory);
+		}
+		if (cores != -1) {
+			smr.setCpu(cores);
+		}
 	}
 	
 	// Re-request resource means put it back on the requestedResources list

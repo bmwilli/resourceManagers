@@ -36,22 +36,24 @@ import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.CommandInfo;
 import org.apache.mesos.Protos.FrameworkInfo;
 
-import org.json.simple.parser.JSONParser;
-import org.json.simple.parser.ParseException;
-import org.json.simple.JSONObject;
-import org.json.simple.JSONArray;
+//import org.json.simple.parser.JSONParser;
+//import org.json.simple.parser.ParseException;
+//import org.json.simple.JSONObject;
+//import org.json.simple.JSONArray;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.ibm.streams.resourcemgr.AllocateInfo;
 import com.ibm.streams.resourcemgr.AllocateInfo.AllocateType;
 import com.ibm.streams.resourcemgr.AllocateMasterInfo;
 import com.ibm.streams.resourcemgr.ClientInfo;
 import com.ibm.streams.resourcemgr.ResourceDescriptor;
 import com.ibm.streams.resourcemgr.ResourceDescriptorState;
-import com.ibm.streams.resourcemgr.ResourceException;
-import com.ibm.streams.resourcemgr.ResourceManager.Feature;
 import com.ibm.streams.resourcemgr.ResourceManagerAdapter;
 import com.ibm.streams.resourcemgr.ResourceManagerException;
 import com.ibm.streams.resourcemgr.ResourceManagerUtilities;
@@ -401,18 +403,20 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 	public String customCommand(ClientInfo client, String commandData, Locale locale) throws ResourceManagerException {
     	LOG.info("Custom command received");
     	LOG.debug("  command: " + commandData);
-    	JSONObject request;
+    	ObjectMapper mapper = new ObjectMapper();
+ 
+    	
+    	ObjectNode request;
     	try {
-    		JSONParser parser = new JSONParser();
-    		request = (JSONObject) parser.parse(commandData);
-    	} catch (ParseException e) {
+    		request = (ObjectNode) mapper.readTree(commandData);
+    	} catch (Exception e) {
     		LOG.error("Error parsing Custom Command from client " + client.getClientId());
     		throw new ResourceManagerException("Error parsing Custom Command from client " + client.getClientId(),e);
     	}
     	
-    	JSONObject response = new JSONObject();
+    	ObjectNode response = mapper.createObjectNode();
     	response.put(StreamsMesosConstants.CUSTOM_COMMAND_RETURN_CODE, new Integer(-1));
-    	String requestId = (String)request.get(StreamsMesosConstants.CUSTOM_COMMAND);
+    	String requestId = request.get(StreamsMesosConstants.CUSTOM_COMMAND).asText();
     	if (requestId == null) {
     		throw new ResourceManagerException("Custom Command not specified");
     	}
@@ -684,54 +688,7 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 	/// Resource and Tag METHODS
 	///////////////////////////////////////////////
 	
-	/** 
-	 * @param tags
-	 * @param smr
-	 * @throws ResourceTagException
-	 * @throws ResourceManagerException
-	 */
-	public void convertTags(ResourceTags tags, StreamsMesosResource smr) throws ResourceTagException, ResourceManagerException {
-		double cores = -1;
-		double memory = -1;
-		
-		for (String tag : tags.getNames()) {
-			try {
-				TagDefinitionType definitionType = tags.getTagDefinitionType(tag);
-				
-				switch (definitionType) {
-				case NONE:
-					// use default definition (probably just a name tag (e.g. AUDIT)
-					break;
-				case PROPERTIES:
-					Properties propsDef = tags.getDefinitionAsProperties(tag);
-					LOG.trace("Tag=" + tag + " props=" + propsDef.toString());
-					if (propsDef.containsKey(StreamsMesosConstants.MEMORY_TAG)) {
-						//memory = Math.max(memory,  Utils.getIntProperty(propsDef, StreamsMesosConstants.MEMORY_TAG));
-						memory = Utils.getDoubleProperty(propsDef, StreamsMesosConstants.MEMORY_TAG);
-						LOG.trace("Tag=" + tag + " memory=" + memory);
-					}
-					if (propsDef.containsKey(StreamsMesosConstants.CORES_TAG)) {
-						//cores = Math.max(cores,  Utils.getDoubleProperty(propsDef, StreamsMesosConstants.CORES_TAG));
-						cores = Utils.getDoubleProperty(propsDef, StreamsMesosConstants.CORES_TAG);
-						LOG.trace("Tag=" + tag + " cores=" + cores);
-					}
-					break;
-				default:
-					throw new ResourceTagException("Tag=" + tag + " has unsupported tag definition type=" + definitionType);
-				}
-			} catch (ResourceException rs) {
-				throw new ResourceManagerException(rs);
-			}
-		}
-		
-		// Override memory and cores if they were set by the tags
-		if (memory != -1){
-			smr.setMemory(memory);
-		}
-		if (cores != -1) {
-			smr.setCpu(cores);
-		}
-	}
+
 	
     private void validateTagAttribute(String tag, String key, Object valueObj) throws ResourceTagException {
         //memory, cores
@@ -996,17 +953,16 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 	//////////////////////////////////////
 	
 	// Future put it its own class
-	public void getResourceState(JSONObject request, JSONObject response, ClientInfo client) {
-		JSONArray resources = new JSONArray();
+	public void getResourceState(ObjectNode request, ObjectNode response, ClientInfo client) {
+		ArrayNode resources = response.putArray(StreamsMesosConstants.CUSTOM_RESULT_RESOURCES);
 		
-		boolean longVersion = Boolean.parseBoolean((String)request.get(StreamsMesosConstants.CUSTOM_PARM_LONG));
+		boolean longVersion = request.get(StreamsMesosConstants.CUSTOM_PARM_LONG).asBoolean(false);
 		
 		Map<String,StreamsMesosResource> allResources = _state.getAllResources();
 		for (StreamsMesosResource smr : allResources.values()) {
-			resources.add(smr.toJsonObject(longVersion));
+			resources.add(smr.resourceStateAsJsonObjectNode(longVersion));
 		}
 		
-		response.put(StreamsMesosConstants.CUSTOM_RESULT_RESOURCES, resources);
 		response.put(StreamsMesosConstants.CUSTOM_COMMAND_RETURN_CODE, 0);
 	}
 }
