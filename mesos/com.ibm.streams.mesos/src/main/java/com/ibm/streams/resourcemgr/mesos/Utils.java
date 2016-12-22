@@ -16,7 +16,9 @@ import java.io.StringWriter;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.UnknownHostException;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicLong;
@@ -182,4 +184,29 @@ public class Utils {
 			folder.delete();
 		}
 	}
+	
+	
+	// Convert String collection to comma separated
+	public static String toCsv(Collection<String> items) {
+		StringBuilder builder = new StringBuilder();
+		for (String item : items) {
+			if (builder.length() > 0) {
+				builder.append(",");
+			}
+			builder.append(item);
+		}
+		return builder.toString();
+	}
+	
+	// Convert from comma separated to string collection
+	public static Collection<String> fromCsv(String csv) {
+		Collection<String> items = new HashSet<String>();
+		if (items != null && !items.isEmpty()) {
+			for (String item : csv.split(",")) {
+				items.add(item);			
+			}
+		}
+		return items;
+	}
+	
 }

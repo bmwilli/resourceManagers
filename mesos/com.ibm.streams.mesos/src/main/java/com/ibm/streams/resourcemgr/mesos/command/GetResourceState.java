@@ -95,18 +95,18 @@ public class GetResourceState {
 			for (int i = 0; i < resources.size(); i++) {
 				JsonNode resource = resources.get(i);
 				String row[] = new String[colNameList.size()];
-				row[0] = resource.get(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_STREAMS_ID).toString();
-				row[1] = resource.get(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_ID).toString();
-				row[2] = resource.get(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_TASK_ID).toString();
-				row[3] = resource.get(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_RESOURCE_STATE).toString();
-				row[4] = resource.get(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_REQUEST_STATE).toString();
-				row[5] = resource.get(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_COMPLETION_STATUS).toString();
-				row[6] = resource.get(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_HOST_NAME).toString();
-				row[7] = resource.get(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_IS_MASTER).toString();
+				row[0] = resource.get(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_STREAMS_ID).asText();
+				row[1] = resource.get(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_ID).asText();
+				row[2] = resource.get(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_TASK_ID).asText();
+				row[3] = resource.get(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_RESOURCE_STATE).asText();
+				row[4] = resource.get(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_REQUEST_STATE).asText();
+				row[5] = resource.get(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_COMPLETION_STATUS).asText();
+				row[6] = resource.get(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_HOST_NAME).asText();
+				row[7] = resource.get(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_IS_MASTER).asText();
 				if (longVersion) {
-					row[8] = resource.get(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_TAGS).toString();
-					row[9] = resource.get(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_CORES).toString();
-					row[10] = resource.get(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_MEMORY).toString();
+					row[8] = resource.get(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_TAGS).asText();
+					row[9] = resource.get(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_CORES).asText();
+					row[10] = resource.get(StreamsMesosConstants.CUSTOM_RESULT_RESOURCE_MEMORY).asText();
 
 				}
 				tableBody.add(row);

@@ -95,10 +95,9 @@ public class StreamsMesosState {
 	}
 
 	// Create a new SMR and put it proper containers
-	synchronized public StreamsMesosResource createNewResource(ClientInfo client, ResourceTags tags, boolean isMaster, List<Protos.CommandInfo.URI> uriList) throws ResourceManagerException {
+	synchronized public StreamsMesosResource createNewResource(ClientInfo client, ResourceTags tags, boolean isMaster) throws ResourceManagerException {
 		// Create the Resource object (default state is NEW)
-		StreamsMesosResource smr = new StreamsMesosResource(Utils.generateNextId("resource"), client, _manager, _manager.getConfig(),
-				uriList);
+		StreamsMesosResource smr = new StreamsMesosResource(Utils.generateNextId("resource"), client, _manager);
 
 		smr.setMaster(isMaster);
 		
@@ -118,10 +117,10 @@ public class StreamsMesosState {
 		
 		// Add to collections to track
 		LOG.debug("Queuing new Resource Request: " + smr.toString());
-		// These might be the same thing...need to determine this.
+		
 		_allResources.put(smr.getId(), smr);
 		requestResource(smr);
-
+		
 		return smr;
 	}
 	

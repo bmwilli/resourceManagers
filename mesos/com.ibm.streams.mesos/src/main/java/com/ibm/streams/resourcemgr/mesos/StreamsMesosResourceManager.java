@@ -170,6 +170,13 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 		return _config;
 	}
 	
+	/**
+	 * @return the _uriList
+	 */
+	public List<Protos.CommandInfo.URI> getUriList() {
+		return _uriList;
+	}
+
 	////////////////////////////////
 	/// Configuration Management
 	////////////////////////////////
@@ -755,7 +762,7 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 		
 		for (int i = 0; i < count; i++) {
 			// Creates new Resource, queues, and adds to map of all resources
-			StreamsMesosResource smr = _state.createNewResource(clientInfo, tags, isMaster, _uriList);
+			StreamsMesosResource smr = _state.createNewResource(clientInfo, tags, isMaster);
 			// Put it in our local list to wait a little bit of time to see if it gets started
 			newRequestsFromStreams.add(smr);
 		}
@@ -793,7 +800,7 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 					// Ensure it is running and has been for our minimum duration
 					// We use a minimum duration to prevent reporting quick failures as allocated, only to have to turn around
 					// and revoke them.  This is usually only in the case of a slave not configured properly (e.g. Streams not found)
-					if (smr.isRunning() && (smr.getReesourceStateDurationSeconds() > _waitAllocatedSecs)) {
+					if (smr.isRunning() && (smr.getResourceStateDurationSeconds() > _waitAllocatedSecs)) {
 						LOG.debug("Resource " + smr.getId() + " Mesos task has been running longer than " + _waitAllocatedSecs + ".  Will notify after waiting for all requests.");
 						runningCount++;
 					}

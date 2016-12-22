@@ -31,7 +31,6 @@ import java.util.Set;
 import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.CommandInfo;
 import org.apache.mesos.Protos.Resource;
-//import org.json.simple.JSONObject;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -53,137 +52,133 @@ class StreamsMesosResource {
 
 	// Represents interpretation of Mesos Task
 	public static enum ResourceState {
-		NEW, LAUNCHED, RUNNING, STOPPING, STOPPED, FAILED, CANCELLED;
-		@Override
-		public String toString() {
-			switch (this) {
-			case NEW:
-				return "NEW";
-			case LAUNCHED:
-				return "LAUNCHED";
-			case RUNNING:
-				return "RUNNING";
-			case STOPPING:
-				return "STOPPING";
-			case STOPPED:
-				return "STOPPED";
-			case FAILED:
-				return "FAILED";
-			case CANCELLED:
-				return "CANCELLED";
-			default:
-				throw new IllegalArgumentException();
-			}
+		NEW(0), LAUNCHED(1), RUNNING(2), STOPPING(3), STOPPED(4), FAILED(5), CANCELLED(6);
+
+		ResourceState(int state) {}
+		
+		public static ResourceState fromState(int state) {
+			return values()[state];
 		}
 	}
 	
 	// Represents standing with IBM Streams for this request
 	public static enum RequestState {
-		NEW, ALLOCATED, PENDING, CANCELLED, RELEASED;
-		@Override
-		public String toString() {
-			switch(this) {
-			case NEW:
-				return "NEW";
-			case PENDING:
-				return "PENDING";
-			case ALLOCATED:
-				return "ALLOCATED";
-			case CANCELLED:
-				return "CANCELLED";
-			case RELEASED:
-				return "RELEASED";
-			default:
-				throw new IllegalArgumentException();
-			}
+		NEW(0), ALLOCATED(1), PENDING(2), CANCELLED(3), RELEASED(4);
+		
+		RequestState(int state) {}
+		
+		public static RequestState fromState(int state) {
+			return values()[state];
 		}
 	}
 	
 	// Represents completion status for the task
 	public static enum TaskCompletionStatus {
-		NONE, FINISHED, FAILED, ERROR, KILLED, LOST;
-		@Override
-		public String toString() {
-			switch(this) {
-			case NONE:
-				return "NONE";
-			case FINISHED:
-				return "FINISHED";
-			case FAILED:
-				return "FAILED";
-			case ERROR:
-				return "ERROR";
-			case KILLED:
-				return "KILLED";
-			case LOST:
-				return "LOST";
-			default:
-				throw new IllegalArgumentException();
-			}
-		}
+		NONE(0), FINISHED(1), FAILED(2), ERROR(3), KILLED(4), LOST(5);
+		
+		TaskCompletionStatus(int state) {}
+		
+		public static TaskCompletionStatus fromState(int state) {
+			return values()[state];
+		}	
 	}
 
-	// Unique Identier used for identification within Framework and for Mesos
-	// Task ID
-	private String _resourceId;
-	// Streams Display name
-	private String _streamsDisplayName;
-	// Client Info that requested this resource
-	private ClientInfo _client;
-	// Resource manager
-	private StreamsMesosResourceManager _manager;
-	// Streams related members
+	// PRIVATE MEMBERS require persisting
+	private String _resourceId; // Unique Identifier
+	private String _streamsDisplayName; // Streams Display Name
+	private String _clientId; // Client ID that requested this resource
 	private String _domainId = null;
 	private String _zkConnect = null;
-	// Need to understand more about how this is used within containers
-	// Was getting error about key not found, os went with Yarn RM approach to test
 	private String _homeDir = null;
-
 	private ResourceState _resourceState = ResourceState.NEW;
 	private RequestState _requestState = RequestState.NEW;
 	private TaskCompletionStatus _taskCompletionStatus = TaskCompletionStatus.NONE;
-	
-	// Time of last resoureState change.  Allows us to verify task running for a minimum amount of time
-	// Use System.currentTimeMillis() to set
-	private long _resourceStateChangeTime = System.currentTimeMillis();
-	
+	private long _resourceStateChangeTime = System.currentTimeMillis();  // Time of last resourceState change
 	private Set<String> _tags = new HashSet<String>();
-
-	private Properties _config;
-	private List<Protos.CommandInfo.URI> _uriList;
-
-	// Resource Request utilization related members
-	private double _memory = -1;
-	private double _cpu = -1;
-	
-	// Resource Task utilization related members
-	private double _memoryAllocated = -1;
-	private double _cpuAllocated = -1;
-
+	private double _memory = -1; // requested Memory
+	private double _cpu = -1; // requested CPU
+	private double _memoryAllocated = -1; // allocated Memory
+	private double _cpuAllocated = -1; // allocated CPU
 	private boolean _isMaster = false;
+	private String _resourceType = null; // usually mesos, but is a variable
+	private String _taskId = null;  // Mesos task ID
+	private String _hostName = null; // Hostname task is running in
+	
+	// PRIVATE MEMBERS need to be re-acquired after de-serialized from persistence	
+	// Resource manager
+	private StreamsMesosResourceManager _manager; // Resource manager
+	
 
-	// Mesos Task related members
-	private String _taskId = null;
-	private String _hostName = null;
 	
-	private String _resourceType = null;
-	
-	//public StreamsMesosResource(String id, ClientInfo client, String domainId, String zk, int priority, Map<String, String> argsMap,
-	public StreamsMesosResource(String id, ClientInfo client, StreamsMesosResourceManager manager, Properties config,
-			List<Protos.CommandInfo.URI> uriList) {
+	// Constructor for initial creation
+	public StreamsMesosResource(String id, ClientInfo client, StreamsMesosResourceManager manager) {
 		this._resourceId = id;
-		this._resourceType = Utils.getProperty(config, StreamsMesosConstants.PROPS_RESOURCE_TYPE);
+		this._resourceType = Utils.getProperty(manager.getConfig(), StreamsMesosConstants.PROPS_RESOURCE_TYPE);
 		this._streamsDisplayName =  this._resourceType + "_" + id;
-		this._client = client;
+		this._clientId = client.getClientId();
 		this._manager = manager;
 		this._domainId = client.getDomainId();
 		this._zkConnect = client.getZkConnect();
-		//this.priority = priority;
-		this._config = config;
-		this._uriList = uriList;
-		this._homeDir = Utils.getProperty(config, StreamsMesosConstants.PROPS_USER_HOME);
+		this._homeDir = Utils.getProperty(manager.getConfig(), StreamsMesosConstants.PROPS_USER_HOME);
 	}
+	
+	// Constructor from persisted Properties
+    public StreamsMesosResource(StreamsMesosResourceManager manager, Properties props) {
+        _manager = manager;
+        
+        _resourceId = props.getProperty("resourceId");
+        _streamsDisplayName = props.getProperty("streamsDisplayName");
+        _clientId = props.getProperty("clientId");
+        _domainId = props.getProperty("domainId");
+        _zkConnect = props.getProperty("zkConnect");
+        _homeDir = props.getProperty("homeDir");
+        _resourceState = ResourceState.valueOf(props.getProperty("resourceState"));
+        _requestState = RequestState.valueOf(props.getProperty("requestState"));
+        _taskCompletionStatus = TaskCompletionStatus.valueOf(props.getProperty("taskCompletionStatus"));
+        _resourceStateChangeTime = Long.parseLong(props.getProperty("resourceStateChangeTime"));
+        _tags = (Set<String>)Utils.fromCsv(props.getProperty("tags"));
+        _memory = Double.parseDouble(props.getProperty("memory"));
+        _cpu = Double.parseDouble(props.getProperty("cpu"));
+        _memoryAllocated = Double.parseDouble(props.getProperty("memoryAllocated"));
+        _cpuAllocated = Double.parseDouble(props.getProperty("cpuAllocated"));
+        _isMaster = props.getProperty("isMaster").equals("true");
+        _resourceType = props.getProperty("resourceType");
+        _taskId = props.getProperty("taskId");
+        _hostName = props.getProperty("hostName");
+    }	
+    
+    
+	/**
+     * Returns request properties used to re-construct
+     * 
+     * @return Properties
+     */
+    public Properties getProperties() {
+        Properties props = new Properties();
+        props.setProperty("resourceId", _resourceId);
+        props.setProperty("streamsDisplayName", _streamsDisplayName);
+        props.setProperty("clientId", _clientId);
+        props.setProperty("domainId", _domainId);
+        props.setProperty("zkConnect", _zkConnect);
+        props.setProperty("homeDir",  _homeDir);
+        props.setProperty("resourceState", _resourceState.name());
+        props.setProperty("requestState", _requestState.name());
+        props.setProperty("taskCompletionStatus", _taskCompletionStatus.name());
+        props.setProperty("resourceStateChangeTime", Long.toString(_resourceStateChangeTime));
+        props.setProperty("tags", Utils.toCsv(_tags));
+        props.setProperty("memory", Double.toString(_memory));
+        props.setProperty("cpu", Double.toString(_cpu));
+        props.setProperty("memoryAllocated", Double.toString(_memoryAllocated));
+        props.setProperty("cpuAllocated", Double.toString(_cpuAllocated));
+        props.setProperty("isMaster", _isMaster ? "true" : "false");
+        props.setProperty("resourceType", _resourceType);
+        props.setProperty("taskId", _taskId);
+        props.setProperty("hostName", _hostName);
 
+        return props;
+    }
+	
+ 
 	public String getId() {
 		return _resourceId;
 	}
@@ -255,7 +250,7 @@ class StreamsMesosResource {
 		this._resourceStateChangeTime = System.currentTimeMillis();
 	}
 	
-	public long getReesourceStateDurationSeconds() {
+	public long getResourceStateDurationSeconds() {
 		return ((System.currentTimeMillis() - this._resourceStateChangeTime) / 1000);
 	}
 	
@@ -345,7 +340,7 @@ class StreamsMesosResource {
 			//cmdBuffer.append(";export HOME=${MESOS_SANDBOX}");
 			cmdBuffer.append("; export HOME=" + getHomeDir());
 
-		if (Utils.getBooleanProperty(_config, StreamsMesosConstants.PROPS_DEPLOY)) {
+		if (Utils.getBooleanProperty(_manager.getConfig(), StreamsMesosConstants.PROPS_DEPLOY)) {
 			// run the streams resource installer
 			// create softlink for StreamsLink
 			cmdBuffer.append(";./StreamsResourceInstall/streamsresourcesetup.sh");
@@ -356,7 +351,7 @@ class StreamsMesosResource {
 		} else {
 			// if --deploy not set, we assume streams is installed on all
 			// machines
-			String streamsInstall = Utils.getProperty(_config, StreamsMesosConstants.PROPS_STREAMS_INSTALL_PATH);
+			String streamsInstall = Utils.getProperty(_manager.getConfig(), StreamsMesosConstants.PROPS_STREAMS_INSTALL_PATH);
 			cmdBuffer.append(";ln -s " + streamsInstall + " StreamsLink");
 		}
 		// Source streams install path
@@ -373,7 +368,7 @@ class StreamsMesosResource {
 		cmdInfoBuilder.setValue(cmdBuffer.toString());
 
 		// Add URI's (if any)
-		cmdInfoBuilder.addAllUris(_uriList);
+		cmdInfoBuilder.addAllUris(_manager.getUriList());
 
 		return cmdInfoBuilder.build();
 	}
@@ -486,14 +481,14 @@ class StreamsMesosResource {
 		Collection<ResourceDescriptor> descriptors = new ArrayList<ResourceDescriptor>();
 		descriptors.add(getDescriptor());
 		LOG.info("Sending resourcesAllocated notification to Streams for resource: " + getId());
-		_manager.getResourceNotificationManager().resourcesAllocated(_client.getClientId(), descriptors);
+		_manager.getResourceNotificationManager().resourcesAllocated(_clientId, descriptors);
 	}
 	
 	public void notifyClientRevoked() {
 		Collection<ResourceDescriptor> descriptors = new ArrayList<ResourceDescriptor>();
 		descriptors.add(getDescriptor());
 		LOG.info("Sending resourcesRevoked notification to Streams for resource: " + getId());
-		_manager.getResourceNotificationManager().resourcesRevoked(_client.getClientId(), descriptors);
+		_manager.getResourceNotificationManager().resourcesRevoked(_clientId, descriptors);
 	}
 
 	@Override
@@ -554,5 +549,15 @@ class StreamsMesosResource {
 		}
 	
 		return resource;
+	}
+	
+	public String toJson() {
+		ObjectMapper mapper = new ObjectMapper();
+		try {
+			return mapper.writeValueAsString(this);
+		} catch (Exception e) {
+			LOG.error("Error creating JSON String of resource " + this.getId() + ": " + e.getMessage());
+			return null;
+		}
 	}
 }

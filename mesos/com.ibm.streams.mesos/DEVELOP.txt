@@ -24,6 +24,40 @@ streamtool addresourcespec --numresources 1[exclusive]
 streamtool addresourcespec --numresources 1,ingest
 streamtool addresourcespec --numresources 1,ingest[exclusive]
 
+## Failover logic
+if !reconciling
+	reconciling = true
+	suspend offers
+	_state.restore()
+	if resource.state == STOPPED, FAILED, CANCELLED then DELETE
+	if requestState == CANCELLED, RELEASED then DELETE
+	else add to reconcileingTasks list
+	driver.reconcileTasks()  // implicit
+	while (not exceed max time && still tasks in reconcilingTasks list)
+		delay(30)
+		add to total time
+	end while
+	Any leftover tasks in reconcilingTakss the revoke them
+end if
+
+StatusUpdate()
+	if reconciling
+		if not in reconcilingTasks
+			// we do not know about it
+				Stop or kill it
+		else
+			remove from reconcilingTakss
+			Update timestamp
+			Do what about the status?  Normal processing if it is a change?
+			
+
+
+
+## IBM Internal Classes
+* In order to serialize (for storage in persistence) we are utilizing a few internal IBM classes found in the
+  .jar files.  These include:
+	* Casting ClientInfo -> ClientInformation and using the toJson to serialize
+
 ## Concern ISSUE!!
 * Using mesos CommandExecutor
   - It may report running while command is still running streamsresourcesetup.sh and controller is not yet started
