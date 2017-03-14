@@ -20,10 +20,10 @@ See DEVELOP.txt file for notes on what needs to be done
 # Building the Resource Manager
 
 ## Compiling the application
-	`mvn compile`
+`mvn compile`
 
 ## Create deployable Package
-	`mvn package`
+`mvn package`
 
 Package includes:
 * streams-on-mesos: python script to start/stop/status resource manager
@@ -31,12 +31,12 @@ Package includes:
 * streams-on-mesos jar with dependencies: resource manager package of java class files
 	
 ## Install locally for testing
-    `mvn install`
+`mvn install`
 
 This installs the streams-on-mesos jar into a lib directory at the same level as the pom.xml file.  The streams-on-mesos script in the scripts directory will check in this relative location when it is executed.  This allows for quickly testing the script and properties file from the same location as they are developed.
 
 ## Install in another location
-	`tar -xvf target/streams-on-mesos-0.0.1-SNAPSHOT.tar.gz -C <install location>`
+`tar -xvf target/streams-on-mesos-0.0.1-SNAPSHOT.tar.gz -C <install location>`
 
 Extract the contents of the tar.gz file into a directory of your choice, change to that directory, and run the application from the scripts directory.
 
