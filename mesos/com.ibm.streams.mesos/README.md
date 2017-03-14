@@ -8,7 +8,40 @@ bmwilli@us.ibm.com
 Please understand that code and this README are at a point in time of ongoing initial development.
 See DEVELOP.txt file for notes on what needs to be done
 
-# Design
+# Contents
+1. [Building the Streams Mesos Resource Manager Framework](#building-the-resource-manager)
+2. [Architecture and Design](#architecture-and-design)
+3. [Running the Resource Manager](#running-the-resource-manager)
+4. [Commands](#commands)
+5. [Resource Tags](#resource-tags)
+6. [Deploy via Marathon](#deploy-via-marathon)
+7. [Logging](#logging)
+
+# Building the Resource Manager
+
+## Compiling the application
+	`mvn compile`
+
+## Create deployable Package
+	`mvn package`
+
+Package includes:
+* streams-on-mesos: python script to start/stop/status resource manager
+* streams-mesos.properties: default properties file
+* streams-on-mesos jar with dependencies: resource manager package of java class files
+	
+## Install locally for testing
+    `mvn install`
+
+This installs the streams-on-mesos jar into a lib directory at the same level as the pom.xml file.  The streams-on-mesos script in the scripts directory will check in this relative location when it is executed.  This allows for quickly testing the script and properties file from the same location as they are developed.
+
+## Install in another location
+	`tar -xvf target/streams-on-mesos-0.0.1-SNAPSHOT.tar.gz -C <install location>`
+
+Extract the contents of the tar.gz file into a directory of your choice, change to that directory, and run the application from the scripts directory.
+
+
+# Architecture and Design
 The current implementation was inspired by the book <b>"Building Applications on Mesos"</b>
 
 <b>Chapter 4 - Creating a new Framework for Mesos</b> was used as a template and reference
@@ -40,7 +73,7 @@ When a resource is released, the ResourcemanagerUtilities.stopController() comma
 
 
 
-# Setup
+# Running the Resource Manager
 
 ## Deployment Decisions
 The Streams Mesos Resource Manager supports two modes of streams runtime deployment: Pre-installed and Runtime-deployed
@@ -164,7 +197,8 @@ Create a tag that will accept any size offer, however utilizes the entire offer 
 `streamtool addresourcespec --numresources 1,mesos_medium`
 
 
-# Deploy Via Marathon (Under Construction)
+# Deploy Via Marathon
+(Under Construction)
 Marathon is a Mesos framework for long-running applications
 
 The Marathon .json file here is just an example.  While under development the properties file deployed in the .tar.gz may not be acceptable for any environment other than the current development environment being used by the author.
@@ -207,15 +241,8 @@ curl -s XPOST http://localhost:8080/v2/apps -d@marathon.json -H "Content-Type: a
     * To check whether Maven is installed on your system, enter which mvn.
     * To download Maven, go to the [Apache Maven website](https://maven.apache.org/).
 * InfoSphere Streams
+	* Currently it needs to be compiled on a system with IBM Streams installed.
 * (optional) [Apache Hadoop Version 2.7.0](https://hadoop.apache.org/) for HDFS provisioning
-
-## Compiling the application
-Use Maven to compile the source code for the application in the InfoSphere Streams MESOS package.
-
-1. Run the following command in your project directory. This command creates a tar.gz file in the target directory.
-
-    `mvn package`
-2. Extract the contents of the tar.gz file into a directory of your choice, change to that directory, and run the application.
 
 
 ## Helpful Notes
