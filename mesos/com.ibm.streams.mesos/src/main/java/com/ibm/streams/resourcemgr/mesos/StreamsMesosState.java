@@ -458,22 +458,27 @@ public class StreamsMesosState {
 	// Release a single resource
 	public void releaseResource(ResourceDescriptor descriptor) throws ResourceManagerException {
 		StreamsMesosResource smr = getResource(getResourceId(descriptor));
-		if (smr == null)
-			throw new ResourceManagerException("Cannot release resource. No such resource: " + descriptor.getNativeResourceId());
-		smr.stop();
+		if (smr != null) {
+			smr.stop();
+		} else {
+			LOG.info("releaseResource: Resource no longer exists (id: " + getResourceId(descriptor) +
+					"), nothing to do.");
+		}
 	}
 	
 	
 	// Release all resources for a given client
+	// !!! NOTE: need to handle multiple clients in the future
 	public void releaseAllResources(ClientInfo client) throws ResourceManagerException {
-		// Verify we are workign with this client
+		// Verify we are working with this client
 		ClientInfo clientInfo = getClientInfo(client.getClientId());
-		if (clientInfo == null)
-			throw new ResourceManagerException("Cannot release all resource. Client unknown: " + client.getClientId());
-		
-		// Fix for multiple clients in the future
-		for (StreamsMesosResource smr : getAllResources().values()) {
-			smr.stop();
+		if (clientInfo != null) {
+			for (StreamsMesosResource smr : getAllResources().values()) {
+				smr.stop();
+			}
+		} else {
+			LOG.info("releaseAllResources: Unknown client (" + client.getClientId() + 
+					"), nothing to do.");
 		}
 	}
 	

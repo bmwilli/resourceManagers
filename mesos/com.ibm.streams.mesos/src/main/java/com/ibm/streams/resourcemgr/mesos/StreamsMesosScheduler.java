@@ -200,6 +200,7 @@ public class StreamsMesosScheduler implements Scheduler {
 			for (Resource r : offer.getResourcesList()) {
 				if (r.getName().equals("cpus")) {
 					offerCpus += r.getScalar().getValue();
+					//offerCpusRole = r.getRole()
 				} else if (r.getName().equals("mem")) {
 					offerMem += r.getScalar().getValue();
 				}

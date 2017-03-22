@@ -425,6 +425,9 @@ class StreamsMesosResource {
 	private Protos.Resource buildResource(String name, double value) {
 		return Protos.Resource.newBuilder().setName(name).setType(Protos.Value.Type.SCALAR)
 				.setScalar(buildScalar(value)).build();
+		// Test with role
+		//return Protos.Resource.newBuilder().setName(name).setType(Protos.Value.Type.SCALAR)
+		//		.setScalar(buildScalar(value)).setRole("streams").build();
 	}
 
 	private Protos.Value.Scalar.Builder buildScalar(double value) {

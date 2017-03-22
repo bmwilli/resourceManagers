@@ -1,6 +1,11 @@
-Test cases and scenarios
-------------------------
+# Test cases and scenarios
 
+## Limitation
+One area that has been lacking in the development of the Streams Mesos Resource Manager is automated testing.  
+
+Hopefully this can be added in a future release cycle.
+
+## Mnaual Tests
 These are not meant to provide complete testing coverage.  
 They are scenarios that need to be met in development to provide a 1.0 version of this resource manager.
 Many of them would have multiple sub test cases with very different configurations and parameters

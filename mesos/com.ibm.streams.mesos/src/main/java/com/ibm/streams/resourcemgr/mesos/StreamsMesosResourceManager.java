@@ -356,10 +356,27 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 		// handle the features we do know about
 		switch (feature) {
 		case HIGH_AVAILABILITY:
-			supported = true;
+			// Set to false for version 0.5
+			// It is not complete (need state saved in zookeeper)
+			supported = false;
 		}
 		LOG.trace("isFeatureSupported returning: " + supported);
 		return supported;
+	}
+
+	
+	
+	
+	
+	/* (non-Javadoc) Determine if we want to allow Resource Server to shutdown.
+	 * Raise 
+	 * @see com.ibm.streams.resourcemgr.ResourceManagerAdapter#validateStop()
+	 */
+	@Override
+	public void validateStop() throws ResourceManagerException {
+		// TODO Auto-generated method stub
+		LOG.info("VALIDATE STOP Called by ResourceManagerServer");
+		super.validateStop();
 	}
 
 	/*
@@ -544,10 +561,6 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 		LOG.debug("descriptors: " + descriptors);
 		LOG.debug("locale: " + locale);
 		for (ResourceDescriptor rd : descriptors) {
-			//if (!_state.getAllResources().containsKey(rd.getNativeResourceId()))
-			//	throw new ResourceManagerException("No such resource: " + rd.getNativeResourceId());
-			//StreamsMesosResource smr = _state.getAllResources().get(rd.getNativeResourceId());
-			//smr.stop(_scheduler);
 			_state.releaseResource(rd);
 		}
 		
@@ -568,11 +581,7 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 		LOG.debug("################ release all client resources start ################");
 		LOG.debug("client: " + client);;
 		LOG.debug("locale: " + locale);
-		//for (StreamsMesosResource smr : _state.getAllResources().values()) {
-		//	smr.stop(_scheduler);
-		//}
 		_state.releaseAllResources(client);
-		
 		LOG.debug("################ release all client resources end ################");
 	}
 
@@ -655,6 +664,10 @@ public class StreamsMesosResourceManager extends ResourceManagerAdapter {
 		builder.setFailoverTimeout(60*60*24*7);  // 1 week
 		builder.setUser(Utils.getProperty(_config, StreamsMesosConstants.PROPS_MESOS_USER));
 		builder.setName(Utils.getProperty(_config, StreamsMesosConstants.PROPS_FRAMEWORK_NAME));
+		
+		// Test setting role
+		//builder.setRole("streams");
+		
 		// Get framework ID from state in case this is a failover.
 		String savedFrameworkId = _state.getMesosFrameworkId();
 		if (savedFrameworkId != null) {

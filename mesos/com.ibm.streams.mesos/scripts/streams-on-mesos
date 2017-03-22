@@ -221,6 +221,9 @@ if(sys.argv[1] == "start"):
 	if not wasTypeSet:
 		command = command + " --type " + type
 		
+	# Background it
+	command = command + " &"
+	
 	rc = system(command)
 	if(rc != 0):
 		sys.exit(1)
@@ -240,6 +243,9 @@ elif(sys.argv[1] == "stop"):
 	if not wasTypeSet:
 		command = command + " --type " + type
 		
+	print "About to run:"
+	print command
+	
 	rc = system(command)
 	if(rc != 0):
 		if(not force):
